@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.0.1 — 2026-07-19
+
+- Replaced the abbreviated in-app privacy notice with the complete privacy policy
+- Added a clickable repository link that opens in the device browser
+
 ## 1.0.0 — 2026-07-19
 
 Initial public release of Ooga Booga Launcher.
