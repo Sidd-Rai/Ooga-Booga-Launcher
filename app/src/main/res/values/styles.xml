@@ -1,0 +1,25 @@
+<resources>
+    <style name="AppTheme" parent="android:style/Theme.Material.NoActionBar">
+        <item name="android:fontFamily">monospace</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:windowBackground">#0B0D0C</item>
+        <item name="android:statusBarColor">#0B0D0C</item>
+        <item name="android:navigationBarColor">#0B0D0C</item>
+        <item name="android:windowActionModeOverlay">true</item>
+        <item name="android:colorAccent">#D3A84C</item>
+        <item name="android:textColorPrimary">#E8DFC8</item>
+        <item name="android:textColorSecondary">#938B79</item>
+        <item name="android:windowNoTitle">true</item>
+        <item name="android:windowDisablePreview">true</item>
+    </style>
+    <style name="AppThemeLight" parent="android:style/Theme.Material.Light.NoActionBar">
+        <item name="android:fontFamily">monospace</item>
+        <item name="android:windowLightStatusBar">true</item>
+        <item name="android:windowBackground">#F4F1E8</item>
+        <item name="android:statusBarColor">#F4F1E8</item>
+        <item name="android:navigationBarColor">#F4F1E8</item>
+        <item name="android:colorAccent">#8B5830</item>
+        <item name="android:windowNoTitle">true</item>
+        <item name="android:windowDisablePreview">true</item>
+    </style>
+</resources>
