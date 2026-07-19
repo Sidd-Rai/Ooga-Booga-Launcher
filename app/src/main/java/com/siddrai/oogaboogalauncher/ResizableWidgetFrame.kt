@@ -1,4 +1,4 @@
-package com.nolauncher
+package com.siddrai.oogaboogalauncher
 
 import android.content.Context
 import android.graphics.Canvas

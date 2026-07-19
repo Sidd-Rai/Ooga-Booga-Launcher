@@ -1,4 +1,4 @@
-package com.nolauncher
+package com.siddrai.oogaboogalauncher
 
 import android.app.Activity
 import android.content.Intent

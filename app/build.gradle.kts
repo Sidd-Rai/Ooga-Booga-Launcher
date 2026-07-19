@@ -4,16 +4,16 @@ plugins {
 }
 
 android {
-    namespace = "com.nolauncher"
+    namespace = "com.siddrai.oogaboogalauncher"
     compileSdk = 36
     buildToolsVersion = "36.1.0"
 
     defaultConfig {
-        applicationId = "com.nolauncher"
+        applicationId = "com.siddrai.oogaboogalauncher"
         minSdk = 26
         targetSdk = 36
-        versionCode = 2
-        versionName = "1.0.1"
+        versionCode = 3
+        versionName = "1.0.2"
     }
 
     compileOptions {

@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.0.2 — 2026-07-19
+
+> **Upgrade notice:** Settings from previous versions will not carry over because the Android package identifier has changed.
+
+- Fixed a crash when recycled entries loaded in the widget browser
+- Isolated invalid third-party widget previews and labels from the launcher
+- Added the launcher icon and completed the Ooga Booga Launcher package rename
+
 ## 1.0.1 — 2026-07-19
 
 - Replaced the abbreviated in-app privacy notice with the complete privacy policy

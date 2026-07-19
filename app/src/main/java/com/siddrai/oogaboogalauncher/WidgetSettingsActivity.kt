@@ -1,4 +1,4 @@
-package com.nolauncher
+package com.siddrai.oogaboogalauncher
 
 import android.app.Activity
 import android.app.AlertDialog
@@ -15,6 +15,7 @@ import android.view.View
 import android.view.ViewGroup
 import android.widget.*
 import java.util.concurrent.Executors
+import java.util.concurrent.RejectedExecutionException
 
 class WidgetSettingsActivity : Activity() {
     private lateinit var store: AppStore
@@ -59,7 +60,7 @@ class WidgetSettingsActivity : Activity() {
         store.widgetIds(screen).forEach { id ->
             val info = manager.getAppWidgetInfo(id)
             root.addView(TextView(this).apply {
-                text = info?.loadLabel(packageManager) ?: "Unavailable widget"; textSize = 16f; setTextColor(MainActivity.INK)
+                text = info?.let(::widgetLabel) ?: "Unavailable widget"; textSize = 16f; setTextColor(MainActivity.INK)
                 gravity = Gravity.CENTER_VERTICAL; layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(58))
                 setOnClickListener { widgetMenu(id, info) }
                 setOnLongClickListener {
@@ -90,7 +91,7 @@ class WidgetSettingsActivity : Activity() {
             override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) = Unit
             override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {
                 val query = s?.toString().orEmpty()
-                adapter.replace(providers.filter { appLabel(it).contains(query, true) || it.loadLabel(packageManager).contains(query, true) })
+                adapter.replace(providers.filter { appLabel(it).contains(query, true) || widgetLabel(it).contains(query, true) })
             }
             override fun afterTextChanged(s: Editable?) = Unit
         })
@@ -132,7 +133,7 @@ class WidgetSettingsActivity : Activity() {
 
     private fun widgetMenu(id: Int, info: AppWidgetProviderInfo?) {
         val actions = if (info?.configure != null) arrayOf("Configure", "Remove") else arrayOf("Remove")
-        AlertDialog.Builder(this).setTitle(info?.loadLabel(packageManager) ?: "Widget").setItems(actions) { _, which ->
+        AlertDialog.Builder(this).setTitle(info?.let(::widgetLabel) ?: "Widget").setItems(actions) { _, which ->
             if (actions[which] == "Configure") {
                 pendingId = id; pendingNew = false
                 startActivityForResult(Intent(AppWidgetManager.ACTION_APPWIDGET_CONFIGURE).apply {
@@ -144,38 +145,65 @@ class WidgetSettingsActivity : Activity() {
         }.show()
     }
 
+    private data class ViewHolder(val image: ImageView, val label: TextView)
+
     private inner class WidgetGalleryAdapter(private val providers: MutableList<AppWidgetProviderInfo>) : BaseAdapter() {
         fun replace(next: List<AppWidgetProviderInfo>) { providers.clear(); providers.addAll(next); notifyDataSetChanged() }
         override fun getCount() = providers.size
         override fun getItem(position: Int) = providers[position]
         override fun getItemId(position: Int) = providers[position].provider.hashCode().toLong()
         override fun getView(position: Int, recycled: View?, parent: ViewGroup?): View {
-            val holder = (recycled as? LinearLayout) ?: LinearLayout(this@WidgetSettingsActivity).apply {
-                orientation = LinearLayout.VERTICAL; gravity = Gravity.CENTER_HORIZONTAL; setPadding(dp(6), dp(8), dp(6), dp(8))
-                addView(ImageView(this@WidgetSettingsActivity).apply {
-                    scaleType = ImageView.ScaleType.CENTER_INSIDE; tag = "image"
-                }, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(120)))
-                addView(TextView(this@WidgetSettingsActivity).apply {
-                    gravity = Gravity.CENTER; textSize = 12f; maxLines = 2; setTextColor(MainActivity.INK); tag = "label"
-                }, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(42)))
+            val row = recycled as? LinearLayout ?: LinearLayout(this@WidgetSettingsActivity).apply {
+                orientation = LinearLayout.VERTICAL
+                gravity = Gravity.CENTER_HORIZONTAL
+                setPadding(dp(6), dp(8), dp(6), dp(8))
+                val image = ImageView(this@WidgetSettingsActivity).apply {
+                    scaleType = ImageView.ScaleType.CENTER_INSIDE
+                }
+                val label = TextView(this@WidgetSettingsActivity).apply {
+                    gravity = Gravity.CENTER
+                    textSize = 12f
+                    maxLines = 2
+                    setTextColor(MainActivity.INK)
+                }
+                addView(image, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(120)))
+                addView(label, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(42)))
+                tag = ViewHolder(image, label)
             }
+            val holder = row.tag as ViewHolder
             val info = getItem(position)
-            val image = holder.findViewWithTag<ImageView>("image")
             val key = info.provider.flattenToString()
-            image.tag = key; image.setImageDrawable(null)
-            previewExecutor.execute {
-                val drawable = info.loadPreviewImage(this@WidgetSettingsActivity, resources.displayMetrics.densityDpi)
-                    ?: info.loadIcon(this@WidgetSettingsActivity, resources.displayMetrics.densityDpi)
-                image.post { if (image.tag == key) image.setImageDrawable(drawable) }
+            holder.image.tag = key
+            holder.image.setImageDrawable(null)
+            try {
+                previewExecutor.execute {
+                    val drawable = try {
+                        info.loadPreviewImage(this@WidgetSettingsActivity, resources.displayMetrics.densityDpi)
+                            ?: info.loadIcon(this@WidgetSettingsActivity, resources.displayMetrics.densityDpi)
+                    } catch (_: Exception) {
+                        null
+                    }
+                    holder.image.post {
+                        if (!isFinishing && !isDestroyed && holder.image.tag == key) {
+                            holder.image.setImageDrawable(drawable)
+                        }
+                    }
+                }
+            } catch (_: RejectedExecutionException) {
+                // The activity is closing; the recycled row no longer needs a preview.
             }
-            holder.findViewWithTag<TextView>("label").text = "${appLabel(info)}\n${info.loadLabel(packageManager)}"
-            return holder
+            holder.label.text = "${appLabel(info)}\n${widgetLabel(info)}"
+            return row
         }
     }
 
     private fun appLabel(info: AppWidgetProviderInfo): String = runCatching {
         packageManager.getApplicationLabel(packageManager.getApplicationInfo(info.provider.packageName, 0)).toString()
     }.getOrElse { info.provider.packageName }
+
+    private fun widgetLabel(info: AppWidgetProviderInfo): String = runCatching {
+        info.loadLabel(packageManager).toString()
+    }.getOrElse { appLabel(info) }
 
     private fun base() = LinearLayout(this).apply {
         orientation = LinearLayout.VERTICAL; setPadding(dp(20), dp(30), dp(20), dp(18)); setBackgroundColor(MainActivity.BG)

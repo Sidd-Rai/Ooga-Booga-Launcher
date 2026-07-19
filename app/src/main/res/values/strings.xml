@@ -1,4 +1,4 @@
 <resources>
-    <string name="app_name">Ooga Booga Launcher</string>
+    <string name="app_name">OB Launcher</string>
     <string name="accessibility_description">Returns to the home screen when a locally configured app timer ends. No information leaves the device.</string>
 </resources>

@@ -8,7 +8,7 @@ I don't collect your data.
 
 Seriously.
 
-OB Launcher doesn't even have the **Internet** permission, so it has nowhere to send your data even if it wanted to.
+Ooga Booga Launcher doesn't even have the **Internet** permission, so it has nowhere to send your data even if it wanted to.
 
 ## What data do I collect?
 
@@ -55,5 +55,4 @@ Though if that ever involves adding trackers, you're legally allowed to be disap
 GitHub: <https://github.com/Sidd-Rai/Ooga-Booga-Launcher>
 
 **~Sid**
-
 

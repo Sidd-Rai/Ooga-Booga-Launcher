@@ -1,4 +1,4 @@
-package com.nolauncher
+package com.siddrai.oogaboogalauncher
 
 import android.app.Activity
 import android.content.Intent
@@ -72,7 +72,7 @@ class PrivacyPolicyActivity : Activity() {
         content.addView(body("If the app changes in a way that affects privacy, this document will be updated."))
         content.addView(body("Though if that ever involves adding trackers, you're legally allowed to be disappointed."))
 
-        content.addView(body("Made with frustration (mostly at other launchers) by Siddharth Rai.", bold = true).apply {
+        content.addView(body("Made with hate (mostly at other launchers)", bold = true).apply {
             setPadding(0, dp(24), 0, dp(10))
         })
         content.addView(TextView(this).apply {
@@ -82,6 +82,7 @@ class PrivacyPolicyActivity : Activity() {
             setPadding(0, dp(4), 0, dp(8))
             setOnClickListener { startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(REPOSITORY_URL))) }
         })
+        content.addView(body("~Sid", bold = true))
 
         setContentView(ScrollView(this).apply {
             isVerticalScrollBarEnabled = false

@@ -1,4 +1,4 @@
-package com.nolauncher
+package com.siddrai.oogaboogalauncher
 
 import android.service.notification.NotificationListenerService
 import android.service.notification.StatusBarNotification
