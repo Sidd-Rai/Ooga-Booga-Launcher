@@ -434,6 +434,8 @@ class MainActivity : Activity() {
 
     private fun screenView(position: Int): View {
         screenCache[position]?.let { cached ->
+            cached.animate().cancel(); cached.visibility = View.VISIBLE
+            cached.alpha = 1f; cached.translationX = 0f; cached.translationY = 0f
             widgetFrames.clear(); widgetFrames.addAll(screenFrameCache[position].orEmpty())
             screenScrollCache[position]?.let { homeScroll = it }
             return cached
