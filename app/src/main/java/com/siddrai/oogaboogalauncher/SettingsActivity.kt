@@ -12,6 +12,7 @@ import android.view.ViewGroup
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
+import org.json.JSONArray
 
 class SettingsActivity : Activity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -48,11 +49,17 @@ class SettingsActivity : Activity() {
             .appendQueryParameter("version", version).build()
         AlertDialog.Builder(this)
             .setTitle("Check for Updates")
-            .setMessage("The launcher can't check.\nIt doesn't have internet.\n\nYour browser, however, does.")
+            .setMessage(randomUpdateJoke())
             .setNegativeButton("CANCEL", null)
             .setPositiveButton("OPEN UPDATE PAGE") { _, _ -> startActivity(Intent(Intent.ACTION_VIEW, url)) }
             .show()
     }
+
+    private fun randomUpdateJoke(): String = runCatching {
+        val text = resources.openRawResource(R.raw.update_jokes).bufferedReader().use { it.readText() }
+        val jokes = JSONArray(text)
+        jokes.getString(kotlin.random.Random.nextInt(jokes.length()))
+    }.getOrDefault("The launcher can't check for updates. Your browser can.")
 
     private fun select(mode: String) = startActivity(Intent(this, AppSelectionActivity::class.java).putExtra("mode", mode))
     @Deprecated("Legacy result API keeps this dependency-free")

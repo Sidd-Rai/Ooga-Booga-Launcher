@@ -13,12 +13,6 @@
         android:usesCleartextTraffic="false">
 
         <activity
-            android:name=".TimerPromptActivity"
-            android:excludeFromRecents="true"
-            android:theme="@style/TimerPromptTheme"
-            android:exported="false" />
-
-        <activity
             android:name=".AccessibilityHelpActivity"
             android:exported="false" />
 

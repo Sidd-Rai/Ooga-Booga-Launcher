@@ -13,17 +13,6 @@ class ShutUpService : NotificationListenerService(), SharedPreferences.OnSharedP
         notification ?: return
         if (notification.packageName in AppStore(this).shutUp()) cancelNotification(notification.key)
     }
-    override fun onNotificationRemoved(
-        notification: StatusBarNotification?,
-        rankingMap: RankingMap?,
-        reason: Int
-    ) {
-        if (reason != REASON_CLICK || notification == null) return
-        if (notification.packageName !in AppStore(this).distracting()) return
-        notification.notification.contentIntent?.let {
-            NotificationLaunchBridge.capture(notification.packageName, it)
-        }
-    }
     override fun onSharedPreferenceChanged(sharedPreferences: SharedPreferences?, key: String?) {
         if (key == "shut_up_apps") cancelMatching()
     }

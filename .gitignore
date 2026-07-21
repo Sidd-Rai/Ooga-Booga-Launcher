@@ -16,3 +16,5 @@ keystore.properties
 signing.properties
 .DS_Store
 captures/
+
+/temp.json

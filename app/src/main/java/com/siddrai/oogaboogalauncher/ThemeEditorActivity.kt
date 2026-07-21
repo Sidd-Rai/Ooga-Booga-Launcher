@@ -33,10 +33,6 @@ class ThemeEditorActivity : Activity() {
         root.addView(TextView(this).apply {
             text = "APPEARANCE"; textSize = 28f; typeface = Typeface.create(Typeface.SERIF, Typeface.BOLD); setTextColor(palette.foreground)
         })
-        root.addView(TextView(this).apply {
-            text = "BUILD A QUIET, PERSONAL PALETTE"; textSize = 10f; letterSpacing = .12f
-            setTextColor(palette.muted); setPadding(0, dp(6), 0, dp(24))
-        })
         mode = RadioGroup(this).apply {
             orientation = RadioGroup.HORIZONTAL
             addView(RadioButton(this@ThemeEditorActivity).apply { id = 1001; text = "Dark"; setTextColor(palette.foreground); isChecked = !palette.light })

@@ -70,11 +70,6 @@ class AppSelectionActivity : Activity() {
             originalSelection = selected.toSet(); editing = true; render()
         })
         root.addView(header)
-        root.addView(TextView(this).apply {
-            text = if (mode == "hidden" && !editing) "TAP TO OPEN  •  HOLD FOR OPTIONS" else "CHANGES ARE APPLIED ONLY WHEN SAVED"
-            textSize = 9f; letterSpacing = .1f; setTextColor(MainActivity.MUTED); setPadding(0, dp(3), 0, dp(8))
-        })
-
         lateinit var search: EditText
         lateinit var rows: LinearLayout
         fun populate(filter: String) {

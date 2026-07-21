@@ -46,6 +46,7 @@ class MainActivity : Activity() {
     private lateinit var widgetHost: AppWidgetHost
     private var activeResizeFrame: ResizableWidgetFrame? = null
     private val widgetFrames = mutableListOf<ResizableWidgetFrame>()
+    private var deleteTarget: TextView? = null
     private var suppressLauncherGesture = false
     private var gestureStartedOnWidget = false
     private val widgetManager by lazy { AppWidgetManager.getInstance(this) }
@@ -219,7 +220,7 @@ class MainActivity : Activity() {
             text = "No pinned apps\nOpen settings to choose a few."
             textSize = 14f; setTextColor(MUTED); setPadding(dp(2), dp(22), 0, dp(22))
         }) else apps.forEach { app -> content.addView(appRow(app)) }
-        homeScroll = ScrollView(this).apply { isVerticalScrollBarEnabled = false; clipChildren = false; addView(content) }
+        homeScroll = ScrollView(this).apply { isVerticalScrollBarEnabled = false; isFillViewport = true; clipChildren = false; addView(content) }
         column.addView(homeScroll, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f))
         val left = store.apps().firstOrNull { it.packageName == store.quickLeft() }
         val right = store.apps().firstOrNull { it.packageName == store.quickRight() }
@@ -252,9 +253,11 @@ class MainActivity : Activity() {
                 onEditStart = { selected ->
                     if (activeResizeFrame !== selected) activeResizeFrame?.finishResize()
                     activeResizeFrame = selected
+                    showDeleteTarget()
                 },
                 onResize = { newWidth, newHeight, finished ->
                     if (finished) {
+                        hideDeleteTarget()
                         transferFrameTranslation(frame)
                         resolveWidgetCollision(frame, canvas, availableWidth)
                         persistWidgetFrame(id, frame, availableWidth)
@@ -263,14 +266,15 @@ class MainActivity : Activity() {
                     updateCanvasHeight(canvas, screen)
                 },
                 onMove = { _, _ ->
-                    transferFrameTranslation(frame)
-                    resolveWidgetCollision(frame, canvas, availableWidth)
-                    persistWidgetFrame(id, frame, availableWidth)
-                    updateCanvasHeight(canvas, screen)
-                },
-                onRemove = {
-                    store.removeWidget(id); widgetHost.deleteAppWidgetId(id)
-                    root.post { refreshHome() }
+                    if (isOverDeleteTarget(frame)) {
+                        hideDeleteTarget(); store.removeWidget(id); widgetHost.deleteAppWidgetId(id)
+                        root.post { refreshHome() }
+                    } else {
+                        hideDeleteTarget(); transferFrameTranslation(frame)
+                        resolveWidgetCollision(frame, canvas, availableWidth)
+                        persistWidgetFrame(id, frame, availableWidth)
+                        updateCanvasHeight(canvas, screen)
+                    }
                 }
             )
             frame.addView(hostView, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
@@ -283,6 +287,27 @@ class MainActivity : Activity() {
         }
         updateCanvasHeight(canvas, screen)
         return canvas
+    }
+
+    private fun showDeleteTarget() {
+        if (deleteTarget != null) return
+        val target = TextView(this).apply {
+            text = "×  REMOVE"; textSize = 12f; letterSpacing = .08f; gravity = Gravity.CENTER; setTextColor(INK)
+            background = GradientDrawable().apply { setColor(BG); cornerRadius = dp(18).toFloat(); setStroke(dp(1), INK) }
+        }
+        deleteTarget = target
+        root.addView(target, FrameLayout.LayoutParams(dp(132), dp(44), Gravity.TOP or Gravity.CENTER_HORIZONTAL).apply { topMargin = dp(10) })
+    }
+
+    private fun hideDeleteTarget() {
+        deleteTarget?.let { root.removeView(it) }; deleteTarget = null
+    }
+
+    private fun isOverDeleteTarget(frame: View): Boolean {
+        val target = deleteTarget ?: return false
+        val frameRect = Rect(); val targetRect = Rect()
+        return frame.getGlobalVisibleRect(frameRect) && target.getGlobalVisibleRect(targetRect) &&
+            targetRect.contains(frameRect.centerX(), frameRect.top + minOf(dp(22), frameRect.height() / 2))
     }
 
     private fun transferFrameTranslation(frame: ResizableWidgetFrame) {
@@ -342,13 +367,16 @@ class MainActivity : Activity() {
 
     private fun widgetScreen(screen: String): View {
         val column = vertical(dp(24), dp(24), dp(24), dp(12))
-        val content = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; clipChildren = false }
+        val content = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL; clipChildren = false
+            minimumHeight = resources.displayMetrics.heightPixels - dp(120)
+        }
         if (store.widgetIds(screen).isNotEmpty()) content.addView(widgetCanvas(screen))
         if (store.widgetIds(screen).isEmpty()) content.addView(TextView(this).apply {
             text = "No widgets on this screen"; textSize = 14f; gravity = Gravity.CENTER
             setTextColor(MUTED); setPadding(0, dp(80), 0, dp(40))
         })
-        homeScroll = ScrollView(this).apply { isVerticalScrollBarEnabled = false; clipChildren = false; addView(content) }
+        homeScroll = ScrollView(this).apply { isVerticalScrollBarEnabled = false; isFillViewport = true; clipChildren = false; clipToPadding = false; addView(content) }
         column.addView(homeScroll, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f))
         installScreenLongPress(column, content, screen)
         return column
