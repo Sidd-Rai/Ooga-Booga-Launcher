@@ -9,13 +9,14 @@ Ooga Booga Launcher is a minimalist, offline-first Android home screen focused o
 - Hidden-app drawer with launch, search, bulk editing, and app actions
 - Standard Android widgets on the home screen
 - Optional left and right widget screens
-- Direct widget moving and edge/corner resizing
+- Direct widget adding, moving, edge/corner resizing, and drag-to-remove
 - Optional home-screen clock
-- Custom light or dark appearance with foreground/background colour controls
+- Custom light or dark appearance with foreground/background colour controls, system fonts, and font sizing
 - Solid system wallpaper matching the selected background colour
 - Distracting-app timers with 1, 5, 10, 15, or custom minute limits
-- Foreground-only timer counting, three optional extensions, and automatic exit when time expires
+- Foreground-only timer counting, notification deep-link preservation, three optional extensions, and automatic exit when time expires
 - ShutUp list for dismissing notifications from selected apps
+- Browser-assisted update checks without granting the launcher Internet access
 - No ads, analytics, accounts, cloud services, or Internet permission
 
 ## Privacy

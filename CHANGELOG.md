@@ -1,5 +1,17 @@
 # Changelog
 
+## 1.2.0 — 2026-07-21
+
+- Added configurable system fonts and font sizing with live previews
+- Added staged Save and Cancel behavior to application selection lists
+- Added direct widget management from home and side screens
+- Added timer support for notification deep links and reusable foreground-only sessions
+- Added optional widget deletion haptics and polished themed action menus
+- Improved widget moving, resizing, previews, animation clipping, and deletion safety
+- Added browser-assisted update checking with an official release and changelog page
+- Improved launcher responsiveness with retained widget screens, cached typography, and exact timer scheduling
+- Fixed Home navigation, drawer gestures, widget-browser crashes, and distracting-app timer enforcement
+
 ## 1.0.2 — 2026-07-19
 
 > **Upgrade notice:** Settings from previous versions will not carry over because the Android package identifier has changed.
