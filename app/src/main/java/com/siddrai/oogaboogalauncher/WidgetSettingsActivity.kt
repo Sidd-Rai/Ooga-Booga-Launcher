@@ -138,7 +138,7 @@ class WidgetSettingsActivity : Activity() {
 
     private fun widgetMenu(id: Int, info: AppWidgetProviderInfo?) {
         val actions = if (info?.configure != null) arrayOf("Configure", "Remove") else arrayOf("Remove")
-        AlertDialog.Builder(this).setTitle(info?.let(::widgetLabel) ?: "Widget").setItems(actions) { _, which ->
+        AppTheme.showMenu(this, info?.let(::widgetLabel) ?: "Widget", actions) { which ->
             if (actions[which] == "Configure") {
                 pendingId = id; pendingNew = false
                 startActivityForResult(Intent(AppWidgetManager.ACTION_APPWIDGET_CONFIGURE).apply {
@@ -147,7 +147,7 @@ class WidgetSettingsActivity : Activity() {
             } else {
                 store.removeWidget(id); host.deleteAppWidgetId(id); renderManage()
             }
-        }.show()
+        }
     }
 
     private data class ViewHolder(val image: ImageView, val label: TextView)

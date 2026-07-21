@@ -1,17 +1,22 @@
 package com.siddrai.oogaboogalauncher
 
 import android.app.Activity
+import android.app.AlertDialog
 import android.app.WallpaperManager
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.Color
 import android.graphics.Typeface
+import android.graphics.drawable.ColorDrawable
+import android.graphics.drawable.GradientDrawable
 import android.graphics.fonts.SystemFonts
 import android.os.Build
 import android.appwidget.AppWidgetHostView
+import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup
 import android.view.ViewTreeObserver
+import android.widget.LinearLayout
 import android.widget.TextView
 import java.util.WeakHashMap
 
@@ -131,6 +136,37 @@ object AppTheme {
             view.typeface = typeface(context, view.typeface?.style ?: Typeface.NORMAL)
         }
         if (view is ViewGroup) for (index in 0 until view.childCount) styleTree(view.getChildAt(index), context)
+    }
+
+    fun showMenu(activity: Activity, title: String?, actions: Array<String>, onSelect: (Int) -> Unit) {
+        val palette = load(activity)
+        val density = activity.resources.displayMetrics.density
+        fun dp(value: Int) = (value * density).toInt()
+        val card = LinearLayout(activity).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(22), dp(20), dp(22), dp(14))
+            background = GradientDrawable().apply {
+                setColor(palette.background); cornerRadius = dp(24).toFloat(); setStroke(dp(1), palette.line)
+            }
+        }
+        title?.let { label -> card.addView(TextView(activity).apply {
+            text = label; textSize = 21f; setTextColor(palette.foreground)
+            typeface = typeface(activity, Typeface.BOLD); setPadding(dp(2), 0, dp(2), dp(12))
+        }) }
+        lateinit var dialog: AlertDialog
+        actions.forEach { action -> card.addView(TextView(activity).apply {
+            text = action; textSize = 15f; gravity = Gravity.CENTER_VERTICAL; setTextColor(palette.foreground)
+            setPadding(dp(2), 0, dp(2), 0); background = GradientDrawable().apply {
+                setColor(blend(palette.foreground, palette.background, .07f)); cornerRadius = dp(14).toFloat()
+            }
+            setOnClickListener { val index = actions.indexOf(action); dialog.dismiss(); onSelect(index) }
+        }, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(50)).apply { bottomMargin = dp(7) }) }
+        dialog = AlertDialog.Builder(activity).setView(card).create()
+        dialog.setOnShowListener {
+            dialog.window?.setBackgroundDrawable(ColorDrawable(Color.TRANSPARENT))
+            dialog.window?.setDimAmount(.42f)
+        }
+        dialog.show()
     }
 
     private fun create(light: Boolean, background: Int, foreground: Int): Palette = Palette(

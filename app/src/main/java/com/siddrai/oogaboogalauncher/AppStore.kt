@@ -1,6 +1,10 @@
 package com.siddrai.oogaboogalauncher
 
 import android.content.Context
+import android.os.Build
+import android.os.VibrationEffect
+import android.os.Vibrator
+import android.os.VibratorManager
 
 data class LaunchableApp(val label: String, val packageName: String)
 
@@ -34,6 +38,17 @@ class AppStore(private val context: Context) {
     fun setShowClock(value: Boolean) = prefs.edit().putBoolean(SHOW_CLOCK, value).apply()
     fun widgetDeleteHaptics() = prefs.getBoolean(WIDGET_DELETE_HAPTICS, true)
     fun setWidgetDeleteHaptics(value: Boolean) = prefs.edit().putBoolean(WIDGET_DELETE_HAPTICS, value).apply()
+    fun performWidgetHaptic(deleting: Boolean) {
+        if (!widgetDeleteHaptics()) return
+        val vibrator = if (Build.VERSION.SDK_INT >= 31)
+            context.getSystemService(VibratorManager::class.java).defaultVibrator
+        else context.getSystemService(Context.VIBRATOR_SERVICE) as Vibrator
+        if (!vibrator.hasVibrator()) return
+        val effect = if (deleting)
+            VibrationEffect.createWaveform(longArrayOf(0, 28, 34, 48), intArrayOf(0, 150, 0, 255), -1)
+        else VibrationEffect.createOneShot(32L, VibrationEffect.DEFAULT_AMPLITUDE)
+        vibrator.vibrate(effect)
+    }
     fun quickLeft(): String? = prefs.getString(QUICK_LEFT, null)
     fun quickRight(): String? = prefs.getString(QUICK_RIGHT, null)
     fun setQuickLeft(value: String?) = prefs.edit().apply { if (value == null) remove(QUICK_LEFT) else putString(QUICK_LEFT, value) }.apply()

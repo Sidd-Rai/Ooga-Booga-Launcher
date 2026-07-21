@@ -142,7 +142,7 @@ class AppSelectionActivity : Activity() {
             if (distracting) "Unmark Distracting" else "Mark Distracting",
             "Unhide", "App info"
         )
-        AlertDialog.Builder(this).setTitle(app.label).setItems(actions) { _, index ->
+        AppTheme.showMenu(this, app.label, actions) { index ->
             when (actions[index]) {
                 "Pin to home" -> { store.setPinned(store.pinned() + app.packageName); selected.remove(app.packageName) }
                 "Unpin from home" -> store.setPinned(store.pinned() - app.packageName)
@@ -152,7 +152,7 @@ class AppSelectionActivity : Activity() {
                 "App info" -> startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:${app.packageName}")))
             }
             if (actions[index] != "App info") { store.setHidden(selected); render() }
-        }.show()
+        }
     }
 
     private fun action(label: String, click: () -> Unit) = TextView(this).apply {

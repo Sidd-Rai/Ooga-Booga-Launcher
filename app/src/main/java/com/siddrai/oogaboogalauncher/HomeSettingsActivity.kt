@@ -29,7 +29,7 @@ class HomeSettingsActivity : Activity() {
         root.addView(option("BOTTOM SHORTCUTS") { startActivity(Intent(this, QuickAppsActivity::class.java)) })
         root.addView(toggle("LEFT WIDGET SCREEN", store.leftScreen()) { store.setLeftScreen(it); render() })
         root.addView(toggle("RIGHT WIDGET SCREEN", store.rightScreen()) { store.setRightScreen(it); render() })
-        root.addView(toggle("WIDGET DELETE HAPTICS", store.widgetDeleteHaptics()) { store.setWidgetDeleteHaptics(it) })
+        root.addView(toggle("WIDGET DELETE HAPTICS", store.widgetDeleteHaptics()) { store.setWidgetDeleteHaptics(it); if (it) store.performWidgetHaptic(false) })
         setContentView(ScrollView(this).apply { isFillViewport = true; setBackgroundColor(MainActivity.BG); addView(root) })
     }
     private fun selectApps() = startActivity(Intent(this, AppSelectionActivity::class.java).putExtra("mode", "pinned"))

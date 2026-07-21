@@ -14,11 +14,7 @@ import android.graphics.Rect
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
 import android.graphics.drawable.ColorDrawable
-import android.os.Build
 import android.os.Bundle
-import android.os.VibrationEffect
-import android.os.Vibrator
-import android.os.VibratorManager
 import android.net.Uri
 import android.provider.Settings
 import android.text.Editable
@@ -277,7 +273,7 @@ class MainActivity : Activity() {
                 },
                 onMove = { _, _ ->
                     if (deleteTargetArmed && isOverDeleteTarget(frame)) {
-                        widgetHaptic(true)
+                        store.performWidgetHaptic(true)
                         hideDeleteTarget(); store.removeWidget(id); widgetHost.deleteAppWidgetId(id)
                         root.post { refreshHome() }
                     } else {
@@ -319,7 +315,7 @@ class MainActivity : Activity() {
         if (hovered != deleteTargetHovered) {
             deleteTargetHovered = hovered
             deleteTarget?.animate()?.scaleX(if (hovered) 1.1f else 1f)?.scaleY(if (hovered) 1.1f else 1f)?.setDuration(70)?.start()
-            if (hovered && deleteTargetArmed) widgetHaptic(false)
+            if (hovered && deleteTargetArmed) store.performWidgetHaptic(false)
         }
     }
 
@@ -328,18 +324,6 @@ class MainActivity : Activity() {
         deleteTargetHovered = false; deleteTargetArmed = false
     }
 
-    private fun widgetHaptic(deleting: Boolean) {
-        if (!store.widgetDeleteHaptics()) return
-        val vibrator = if (Build.VERSION.SDK_INT >= 31)
-            getSystemService(VibratorManager::class.java).defaultVibrator
-        else (getSystemService(VIBRATOR_SERVICE) as Vibrator)
-        if (!vibrator.hasVibrator()) return
-        if (Build.VERSION.SDK_INT >= 29) vibrator.vibrate(VibrationEffect.createPredefined(
-            if (deleting) VibrationEffect.EFFECT_HEAVY_CLICK else VibrationEffect.EFFECT_TICK
-        )) else if (Build.VERSION.SDK_INT >= 26) vibrator.vibrate(VibrationEffect.createOneShot(
-            if (deleting) 45L else 18L, if (deleting) 190 else 90
-        )) else vibrator.vibrate(if (deleting) 45L else 18L)
-    }
 
     private fun isOverDeleteTarget(frame: View): Boolean {
         val target = deleteTarget ?: return false
@@ -430,11 +414,11 @@ class MainActivity : Activity() {
     }
 
     private fun showScreenMenu(screen: String) {
-        AlertDialog.Builder(this).setItems(arrayOf("Widgets", "Appearance")) { _, index ->
+        AppTheme.showMenu(this, null, arrayOf("Widgets", "Appearance")) { index ->
             if (index == 0) startActivityForResult(Intent(this, WidgetSettingsActivity::class.java)
                 .putExtra("screen", screen).putExtra(WidgetSettingsActivity.EXTRA_BROWSE, true), 73)
             else startActivityForResult(Intent(this, ThemeEditorActivity::class.java), 72)
-        }.show()
+        }
     }
 
     private fun screenView(position: Int): View {
@@ -606,7 +590,7 @@ class MainActivity : Activity() {
             if (distracting) "Unmark Distracting" else "Mark Distracting",
             "Hide", "App info"
         )
-        AlertDialog.Builder(this).setTitle(app.label).setItems(actions) { _, index ->
+        AppTheme.showMenu(this, app.label, actions) { index ->
             when (actions[index]) {
                 "Pin to home" -> { store.setPinned(store.pinned() + app.packageName); store.setHidden(store.hidden() - app.packageName) }
                 "Unpin from home" -> store.setPinned(store.pinned() - app.packageName)
@@ -616,7 +600,7 @@ class MainActivity : Activity() {
                 "App info" -> startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:${app.packageName}")))
             }
             if (actions[index] != "App info") { refresh(); refreshHome() }
-        }.show()
+        }
     }
     private fun refreshHome() {
         if (!::root.isInitialized) return
