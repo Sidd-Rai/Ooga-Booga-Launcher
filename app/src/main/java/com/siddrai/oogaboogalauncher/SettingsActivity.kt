@@ -18,7 +18,7 @@ class SettingsActivity : Activity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         AppTheme.prepare(this); super.onCreate(savedInstanceState); AppTheme.apply(this)
         val root = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL; setPadding(dp(24), dp(34), dp(24), dp(20)); setBackgroundColor(MainActivity.BG)
+            orientation = LinearLayout.VERTICAL; setPadding(dp(24), dp(40), dp(24), dp(20)); setBackgroundColor(MainActivity.BG)
         }
         root.addView(TextView(this).apply {
             text = "SETTINGS"; textSize = 30f; typeface = Typeface.create(Typeface.SERIF, Typeface.BOLD)

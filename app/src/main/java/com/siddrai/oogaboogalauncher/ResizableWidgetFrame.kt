@@ -17,7 +17,9 @@ class ResizableWidgetFrame(
     private val maximumHeight: Int,
     private val onEditStart: (ResizableWidgetFrame) -> Unit,
     private val onResize: (width: Int, height: Int, finished: Boolean) -> Unit,
-    private val onMove: (offsetX: Float, offsetY: Float) -> Unit
+    private val onMove: (offsetX: Float, offsetY: Float) -> Unit,
+    private val onMoveProgress: () -> Unit,
+    private val onEditEnd: () -> Unit
 ) : FrameLayout(context) {
     private val paint = Paint(Paint.ANTI_ALIAS_FLAG)
     private val handle = dp(7).toFloat(); private val hit = dp(18).toFloat()
@@ -44,7 +46,7 @@ class ResizableWidgetFrame(
     fun finishResize() {
         if (!editing) return
         editing = false; moving = false
-        parent?.requestDisallowInterceptTouchEvent(false); onResize(width, height, true); invalidate()
+        parent?.requestDisallowInterceptTouchEvent(false); onResize(width, height, true); onEditEnd(); invalidate()
     }
 
     override fun dispatchTouchEvent(event: MotionEvent): Boolean {
@@ -74,6 +76,7 @@ class ResizableWidgetFrame(
                 if (moving) {
                     translationX = startTranslationX + dx
                     translationY = startTranslationY + dy
+                    onMoveProgress()
                 } else {
                     val nextWidth = when { right -> startWidth + dx.toInt(); left -> startWidth - dx.toInt(); else -> startWidth }
                         .coerceIn(dp(120), maximumWidth)

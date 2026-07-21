@@ -21,6 +21,7 @@ import android.text.Editable
 import android.text.TextWatcher
 import android.text.InputType
 import android.view.Gravity
+import android.view.HapticFeedbackConstants
 import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
@@ -47,6 +48,8 @@ class MainActivity : Activity() {
     private var activeResizeFrame: ResizableWidgetFrame? = null
     private val widgetFrames = mutableListOf<ResizableWidgetFrame>()
     private var deleteTarget: TextView? = null
+    private var deleteTargetHovered = false
+    private var screenLongPressAllowed = false
     private var suppressLauncherGesture = false
     private var gestureStartedOnWidget = false
     private val widgetManager by lazy { AppWidgetManager.getInstance(this) }
@@ -120,7 +123,9 @@ class MainActivity : Activity() {
             return handled
         }
         when (event.actionMasked) {
-            MotionEvent.ACTION_DOWN -> { downX = event.x; downY = event.y }
+            MotionEvent.ACTION_DOWN -> { downX = event.x; downY = event.y; screenLongPressAllowed = true }
+            MotionEvent.ACTION_MOVE -> if (abs(event.x - downX) > ViewConfiguration.get(this).scaledTouchSlop ||
+                abs(event.y - downY) > ViewConfiguration.get(this).scaledTouchSlop) screenLongPressAllowed = false
             MotionEvent.ACTION_UP -> {
                 val dx = event.x - downX
                 val dy = event.y - downY
@@ -150,7 +155,8 @@ class MainActivity : Activity() {
     }
 
     private fun buildPages(keepDrawer: Boolean = false) {
-        root = FrameLayout(this).apply { setBackgroundColor(BG) }
+        deleteTarget = null; deleteTargetHovered = false; activeResizeFrame = null
+        root = FrameLayout(this).apply { setBackgroundColor(BG); clipChildren = false; clipToPadding = false }
         home = screenView(currentScreen)
         drawer = drawerView()
         root.addView(home)
@@ -169,6 +175,7 @@ class MainActivity : Activity() {
 
     private fun showDrawer(animated: Boolean = true) {
         if (drawerOpen) return
+        screenLongPressAllowed = false
         drawerOpen = true
         registerDrawerBack()
         drawer.visibility = View.VISIBLE
@@ -203,7 +210,7 @@ class MainActivity : Activity() {
 
     private fun homeView(): View {
         val column = vertical(dp(24), dp(24), dp(24), dp(12))
-        val content = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; clipChildren = false }
+        val content = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; clipChildren = false; clipToPadding = false }
         if (store.showClock()) {
             content.addView(TextClock(this).apply {
                 format12Hour = "h:mm"; format24Hour = "HH:mm"; textSize = 58f
@@ -220,7 +227,7 @@ class MainActivity : Activity() {
             text = "No pinned apps\nOpen settings to choose a few."
             textSize = 14f; setTextColor(MUTED); setPadding(dp(2), dp(22), 0, dp(22))
         }) else apps.forEach { app -> content.addView(appRow(app)) }
-        homeScroll = ScrollView(this).apply { isVerticalScrollBarEnabled = false; isFillViewport = true; clipChildren = false; addView(content) }
+        homeScroll = ScrollView(this).apply { isVerticalScrollBarEnabled = false; isFillViewport = true; clipChildren = false; clipToPadding = false; addView(content) }
         column.addView(homeScroll, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f))
         val left = store.apps().firstOrNull { it.packageName == store.quickLeft() }
         val right = store.apps().firstOrNull { it.packageName == store.quickRight() }
@@ -235,7 +242,7 @@ class MainActivity : Activity() {
 
     private fun widgetCanvas(screen: String): FrameLayout {
         val availableWidth = resources.displayMetrics.widthPixels - dp(48)
-        val canvas = FrameLayout(this).apply { clipChildren = false; setBackgroundColor(Color.TRANSPARENT) }
+        val canvas = FrameLayout(this).apply { clipChildren = false; clipToPadding = false; setBackgroundColor(Color.TRANSPARENT) }
         var nextY = 0
         store.widgetIds(screen).forEach { id ->
             val info = widgetManager.getAppWidgetInfo(id) ?: return@forEach
@@ -246,7 +253,7 @@ class MainActivity : Activity() {
                 ?: (((availableWidth - width) / 2) + dp(store.widgetOffsetX(id))).coerceIn(0, availableWidth - width)
             val initialY = store.widgetY(id)?.let(::dp)
                 ?: (nextY + dp(store.widgetOffsetY(id))).coerceAtLeast(0)
-            val hostView = widgetHost.createView(this, id, info).apply { setAppWidget(id, info) }
+            val hostView = widgetHost.createView(this, id, info).apply { clipChildren = false; clipToPadding = false; setAppWidget(id, info) }
             lateinit var frame: ResizableWidgetFrame
             frame = ResizableWidgetFrame(
                 this, availableWidth, resources.displayMetrics.heightPixels * 2,
@@ -257,7 +264,6 @@ class MainActivity : Activity() {
                 },
                 onResize = { newWidth, newHeight, finished ->
                     if (finished) {
-                        hideDeleteTarget()
                         transferFrameTranslation(frame)
                         resolveWidgetCollision(frame, canvas, availableWidth)
                         persistWidgetFrame(id, frame, availableWidth)
@@ -267,16 +273,20 @@ class MainActivity : Activity() {
                 },
                 onMove = { _, _ ->
                     if (isOverDeleteTarget(frame)) {
+                        if (store.widgetDeleteHaptics()) deleteTarget?.performHapticFeedback(HapticFeedbackConstants.CONFIRM)
                         hideDeleteTarget(); store.removeWidget(id); widgetHost.deleteAppWidgetId(id)
                         root.post { refreshHome() }
                     } else {
-                        hideDeleteTarget(); transferFrameTranslation(frame)
+                        transferFrameTranslation(frame)
                         resolveWidgetCollision(frame, canvas, availableWidth)
                         persistWidgetFrame(id, frame, availableWidth)
                         updateCanvasHeight(canvas, screen)
                     }
-                }
+                },
+                onMoveProgress = { updateDeleteTargetFeedback(frame) },
+                onEditEnd = { hideDeleteTarget() }
             )
+            frame.clipChildren = false; frame.clipToPadding = false
             frame.addView(hostView, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
             canvas.addView(frame, FrameLayout.LayoutParams(width, height).apply { leftMargin = initialX; topMargin = initialY })
             resolveWidgetCollision(frame, canvas, availableWidth)
@@ -295,12 +305,21 @@ class MainActivity : Activity() {
             text = "×  REMOVE"; textSize = 12f; letterSpacing = .08f; gravity = Gravity.CENTER; setTextColor(INK)
             background = GradientDrawable().apply { setColor(BG); cornerRadius = dp(18).toFloat(); setStroke(dp(1), INK) }
         }
-        deleteTarget = target
+        deleteTargetHovered = false; deleteTarget = target
         root.addView(target, FrameLayout.LayoutParams(dp(132), dp(44), Gravity.TOP or Gravity.CENTER_HORIZONTAL).apply { topMargin = dp(10) })
     }
 
+    private fun updateDeleteTargetFeedback(frame: View) {
+        val hovered = isOverDeleteTarget(frame)
+        if (hovered != deleteTargetHovered) {
+            deleteTargetHovered = hovered
+            deleteTarget?.animate()?.scaleX(if (hovered) 1.1f else 1f)?.scaleY(if (hovered) 1.1f else 1f)?.setDuration(70)?.start()
+            if (hovered && store.widgetDeleteHaptics()) deleteTarget?.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
+        }
+    }
+
     private fun hideDeleteTarget() {
-        deleteTarget?.let { root.removeView(it) }; deleteTarget = null
+        deleteTarget?.animate()?.cancel(); deleteTarget?.let { root.removeView(it) }; deleteTarget = null; deleteTargetHovered = false
     }
 
     private fun isOverDeleteTarget(frame: View): Boolean {
@@ -368,7 +387,7 @@ class MainActivity : Activity() {
     private fun widgetScreen(screen: String): View {
         val column = vertical(dp(24), dp(24), dp(24), dp(12))
         val content = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL; clipChildren = false
+            orientation = LinearLayout.VERTICAL; clipChildren = false; clipToPadding = false
             minimumHeight = resources.displayMetrics.heightPixels - dp(120)
         }
         if (store.widgetIds(screen).isNotEmpty()) content.addView(widgetCanvas(screen))
@@ -383,7 +402,9 @@ class MainActivity : Activity() {
     }
 
     private fun installScreenLongPress(column: View, content: View, screen: String) {
-        val listener = View.OnLongClickListener { showScreenMenu(screen); true }
+        val listener = View.OnLongClickListener {
+            if (!drawerOpen && screenLongPressAllowed) { showScreenMenu(screen); true } else false
+        }
         listOf(column, content, homeScroll).forEach { view ->
             view.setOnLongClickListener(listener); view.isLongClickable = true
         }
@@ -601,7 +622,7 @@ class MainActivity : Activity() {
     private fun hideKeyboard() = (getSystemService(INPUT_METHOD_SERVICE) as InputMethodManager)
         .hideSoftInputFromWindow(root.windowToken, 0)
     private fun vertical(l: Int, t: Int, r: Int, b: Int) = LinearLayout(this).apply {
-        orientation = LinearLayout.VERTICAL; setPadding(l, t, r, b)
+        orientation = LinearLayout.VERTICAL; clipChildren = false; clipToPadding = false; setPadding(l, t, r, b)
     }
     private fun textButton(label: String, click: () -> Unit) = TextView(this).apply {
         text = label; textSize = 11f; letterSpacing = .08f; gravity = Gravity.CENTER; setTextColor(ACCENT)

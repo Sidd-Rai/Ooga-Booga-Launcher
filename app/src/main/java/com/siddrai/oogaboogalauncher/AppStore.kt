@@ -32,6 +32,8 @@ class AppStore(private val context: Context) {
     fun setShutUp(values: Set<String>) = prefs.edit().putStringSet(SHUT_UP, values).apply()
     fun showClock() = prefs.getBoolean(SHOW_CLOCK, true)
     fun setShowClock(value: Boolean) = prefs.edit().putBoolean(SHOW_CLOCK, value).apply()
+    fun widgetDeleteHaptics() = prefs.getBoolean(WIDGET_DELETE_HAPTICS, true)
+    fun setWidgetDeleteHaptics(value: Boolean) = prefs.edit().putBoolean(WIDGET_DELETE_HAPTICS, value).apply()
     fun quickLeft(): String? = prefs.getString(QUICK_LEFT, null)
     fun quickRight(): String? = prefs.getString(QUICK_RIGHT, null)
     fun setQuickLeft(value: String?) = prefs.edit().apply { if (value == null) remove(QUICK_LEFT) else putString(QUICK_LEFT, value) }.apply()
@@ -124,6 +126,7 @@ class AppStore(private val context: Context) {
         private const val ACTIVE_EXTENSIONS = "active_extensions"
         private const val ACTIVE_REMAINING = "active_remaining"
         private const val SHOW_CLOCK = "show_clock"
+        private const val WIDGET_DELETE_HAPTICS = "widget_delete_haptics"
         private const val QUICK_LEFT = "quick_left"
         private const val QUICK_RIGHT = "quick_right"
         private const val WIDGETS = "widget_ids"

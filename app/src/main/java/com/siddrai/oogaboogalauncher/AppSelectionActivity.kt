@@ -60,7 +60,7 @@ class AppSelectionActivity : Activity() {
             else -> "HOME SCREEN"
         }
         val root = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL; setPadding(dp(20), dp(24), dp(20), 0); setBackgroundColor(MainActivity.BG)
+            orientation = LinearLayout.VERTICAL; setPadding(dp(20), dp(40), dp(20), 0); setBackgroundColor(MainActivity.BG)
         }
         val header = LinearLayout(this).apply { gravity = Gravity.CENTER_VERTICAL }
         header.addView(TextView(this).apply {

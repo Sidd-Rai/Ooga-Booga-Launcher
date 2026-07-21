@@ -20,7 +20,7 @@ class QuickAppsActivity : Activity() {
 
     private fun render() {
         root = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL; setPadding(dp(24), dp(34), dp(24), dp(20)); setBackgroundColor(MainActivity.BG)
+            orientation = LinearLayout.VERTICAL; setPadding(dp(24), dp(40), dp(24), dp(20)); setBackgroundColor(MainActivity.BG)
         }
         root.addView(TextView(this).apply { text = "BOTTOM SHORTCUTS"; textSize = 27f; setTextColor(MainActivity.INK); setPadding(0, 0, 0, dp(26)) })
         root.addView(slot("LEFT", store.quickLeft()) { store.setQuickLeft(it) })

@@ -19,7 +19,7 @@ class PrivacyPolicyActivity : Activity() {
         val palette = AppTheme.current
         val content = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(dp(24), dp(32), dp(24), dp(36))
+            setPadding(dp(24), dp(40), dp(24), dp(36))
             setBackgroundColor(palette.background)
         }
 

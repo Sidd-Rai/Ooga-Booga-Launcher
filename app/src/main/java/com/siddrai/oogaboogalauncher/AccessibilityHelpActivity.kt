@@ -14,7 +14,7 @@ class AccessibilityHelpActivity : Activity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         AppTheme.prepare(this); super.onCreate(savedInstanceState); AppTheme.apply(this)
         val root = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL; setPadding(dp(24), dp(34), dp(24), dp(24)); setBackgroundColor(MainActivity.BG)
+            orientation = LinearLayout.VERTICAL; setPadding(dp(24), dp(40), dp(24), dp(24)); setBackgroundColor(MainActivity.BG)
         }
         root.addView(TextView(this).apply { text = "TIME-LIMIT ACCESS"; textSize = 28f; setTextColor(MainActivity.INK) })
         root.addView(TextView(this).apply {

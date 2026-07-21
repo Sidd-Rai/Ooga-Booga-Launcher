@@ -54,7 +54,7 @@ class TimeLimitService : AccessibilityService() {
             }
         }
         card.addView(TextView(this).apply {
-            text = label; textSize = 23f; typeface = Typeface.create(AppTheme.font(this@TimeLimitService), Typeface.BOLD)
+            text = label; textSize = 23f; typeface = AppTheme.typeface(this@TimeLimitService, Typeface.BOLD)
             setTextColor(palette.foreground)
         })
         card.addView(TextView(this).apply {
@@ -115,7 +115,7 @@ class TimeLimitService : AccessibilityService() {
             background = GradientDrawable().apply { setColor(palette.background); cornerRadius = dp(22).toFloat() }
         }
         card.addView(TextView(this).apply {
-            text = "OOPS — OUT OF TIME"; textSize = 23f; typeface = Typeface.create(AppTheme.font(this@TimeLimitService), Typeface.BOLD)
+            text = "OOPS — OUT OF TIME"; textSize = 23f; typeface = AppTheme.typeface(this@TimeLimitService, Typeface.BOLD)
             gravity = Gravity.CENTER; setTextColor(palette.foreground); setPadding(0, 0, 0, dp(10))
         })
         card.addView(TextView(this).apply {

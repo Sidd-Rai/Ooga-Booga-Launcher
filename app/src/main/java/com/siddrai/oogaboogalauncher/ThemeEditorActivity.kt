@@ -18,7 +18,8 @@ class ThemeEditorActivity : Activity() {
     private lateinit var foregroundInput: EditText
     private lateinit var preview: TextView
     private lateinit var mode: RadioGroup
-    private lateinit var fontMode: RadioGroup
+    private lateinit var fontChoice: TextView
+    private var selectedFont = "monospace"
     private lateinit var fontSize: SeekBar
     private lateinit var fontSizeLabel: TextView
 
@@ -27,8 +28,9 @@ class ThemeEditorActivity : Activity() {
         super.onCreate(savedInstanceState)
         AppTheme.apply(this)
         val palette = AppTheme.current
+        selectedFont = AppTheme.font(this)
         val root = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL; setPadding(dp(24), dp(28), dp(24), dp(20)); setBackgroundColor(palette.background)
+            orientation = LinearLayout.VERTICAL; setPadding(dp(24), dp(40), dp(24), dp(20)); setBackgroundColor(palette.background)
         }
         root.addView(TextView(this).apply {
             text = "APPEARANCE"; textSize = 28f; typeface = Typeface.create(Typeface.SERIF, Typeface.BOLD); setTextColor(palette.foreground)
@@ -46,18 +48,12 @@ class ThemeEditorActivity : Activity() {
         foregroundInput = colourField(palette.foreground, palette)
         root.addView(colourRow(foregroundInput))
         root.addView(fieldLabel("FONT", palette))
-        fontMode = RadioGroup(this).apply {
-            orientation = RadioGroup.HORIZONTAL
-            listOf(2001 to "monospace", 2002 to "sans-serif", 2003 to "serif").forEach { (viewId, family) ->
-                addView(RadioButton(this@ThemeEditorActivity).apply {
-                    id = viewId
-                    text = when (family) { "sans-serif" -> "Sans"; "serif" -> "Serif"; else -> "Mono" }
-                    setTextColor(palette.foreground)
-                    isChecked = AppTheme.font(this@ThemeEditorActivity) == family
-                })
-            }
+        fontChoice = TextView(this).apply {
+            text = AppTheme.fontLabel(selectedFont); textSize = 16f; gravity = Gravity.CENTER_VERTICAL
+            setTextColor(palette.foreground); AppTheme.previewTypeface(this, selectedFont)
+            setPadding(0, dp(8), 0, 0); setOnClickListener { showFontPicker() }
         }
-        root.addView(fontMode)
+        root.addView(fontChoice, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(54)))
         fontSizeLabel = fieldLabel("FONT SIZE  •  ${(AppTheme.fontScale(this) * 100).toInt()}%", palette)
         root.addView(fontSizeLabel)
         fontSize = SeekBar(this).apply {
@@ -85,7 +81,7 @@ class ThemeEditorActivity : Activity() {
                 val bg = parse(backgroundInput.text.toString()) ?: return@setOnClickListener toast("Invalid background colour")
                 val fg = parse(foregroundInput.text.toString()) ?: return@setOnClickListener toast("Invalid foreground colour")
                 AppTheme.save(this@ThemeEditorActivity, mode.checkedRadioButtonId == 1002, bg, fg)
-                AppTheme.saveTypography(this@ThemeEditorActivity, selectedFont(), .8f + fontSize.progress / 100f)
+                AppTheme.saveTypography(this@ThemeEditorActivity, selectedFont, .8f + fontSize.progress / 100f)
                 setResult(RESULT_OK)
                 finish()
             }
@@ -96,7 +92,6 @@ class ThemeEditorActivity : Activity() {
             override fun afterTextChanged(s: Editable?) = Unit
         }
         backgroundInput.addTextChangedListener(watcher); foregroundInput.addTextChangedListener(watcher)
-        fontMode.setOnCheckedChangeListener { _, _ -> updatePreview() }
         mode.setOnCheckedChangeListener { _, checkedId ->
             if (checkedId == 1002) {
                 backgroundInput.setText("#F6F4EE"); foregroundInput.setText("#1C1D1C")
@@ -165,10 +160,35 @@ class ThemeEditorActivity : Activity() {
         val bg = parse(backgroundInput.text.toString()) ?: return
         val fg = parse(foregroundInput.text.toString()) ?: return
         preview.setTextColor(fg)
-        AppTheme.previewTypography(preview, selectedFont(), .8f + fontSize.progress / 100f)
+        AppTheme.previewTypography(preview, selectedFont, .8f + fontSize.progress / 100f)
         preview.background = GradientDrawable().apply { setColor(bg); cornerRadius = dp(18).toFloat() }
     }
-    private fun selectedFont() = when (fontMode.checkedRadioButtonId) { 2002 -> "sans-serif"; 2003 -> "serif"; else -> "monospace" }
+    private fun showFontPicker() {
+        val fonts = AppTheme.availableFonts()
+        val list = ListView(this).apply { divider = null }
+        list.adapter = object : BaseAdapter() {
+            override fun getCount() = fonts.size
+            override fun getItem(position: Int) = fonts[position]
+            override fun getItemId(position: Int) = position.toLong()
+            override fun getView(position: Int, recycled: android.view.View?, parent: ViewGroup?): android.view.View {
+                val option = getItem(position)
+                return (recycled as? TextView ?: TextView(this@ThemeEditorActivity)).apply {
+                    text = option.label; textSize = 16f; gravity = Gravity.CENTER_VERTICAL
+                    setTextColor(AppTheme.current.foreground); setPadding(dp(20), 0, dp(20), 0)
+                    AppTheme.previewTypeface(this, option.spec)
+                    layoutParams = AbsListView.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(54))
+                }
+            }
+        }
+        val dialog = AlertDialog.Builder(this).setTitle("CHOOSE FONT").setView(list).setNegativeButton("CANCEL", null).create()
+        list.setOnItemClickListener { _, _, position, _ ->
+            selectedFont = fonts[position].spec
+            fontChoice.text = fonts[position].label; AppTheme.previewTypeface(fontChoice, selectedFont)
+            updatePreview(); dialog.dismiss()
+        }
+        dialog.show()
+    }
+
     private fun parse(value: String): Int? = try { Color.parseColor(value.trim()) } catch (_: IllegalArgumentException) { null }
     private fun toast(text: String) { Toast.makeText(this, text, Toast.LENGTH_SHORT).show() }
     private fun dp(v: Int) = (v * resources.displayMetrics.density).toInt()

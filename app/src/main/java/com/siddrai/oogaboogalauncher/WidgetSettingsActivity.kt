@@ -211,7 +211,7 @@ class WidgetSettingsActivity : Activity() {
     }.getOrElse { appLabel(info) }
 
     private fun base() = LinearLayout(this).apply {
-        orientation = LinearLayout.VERTICAL; setPadding(dp(20), dp(30), dp(20), dp(18)); setBackgroundColor(MainActivity.BG)
+        orientation = LinearLayout.VERTICAL; setPadding(dp(20), dp(40), dp(20), dp(18)); setBackgroundColor(MainActivity.BG)
     }
     private fun title(value: String) = TextView(this).apply {
         text = value; textSize = 27f; typeface = Typeface.create(Typeface.SERIF, Typeface.BOLD)

@@ -6,6 +6,8 @@ import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.Color
 import android.graphics.Typeface
+import android.graphics.fonts.SystemFonts
+import android.os.Build
 import android.appwidget.AppWidgetHostView
 import android.view.View
 import android.view.ViewGroup
@@ -15,6 +17,7 @@ import java.util.WeakHashMap
 
 data class Palette(val background: Int, val foreground: Int, val muted: Int,
                    val accent: Int, val line: Int, val light: Boolean)
+data class FontOption(val label: String, val spec: String)
 
 object AppTheme {
     private const val LIGHT = "theme_light"
@@ -63,6 +66,33 @@ object AppTheme {
             .putString(FONT, font).putFloat(FONT_SCALE, scale.coerceIn(.8f, 1.3f)).apply()
     }
 
+    fun availableFonts(): List<FontOption> {
+        val generic = listOf(
+            FontOption("Monospace", "monospace"),
+            FontOption("Sans Serif", "sans-serif"),
+            FontOption("Serif", "serif")
+        )
+        if (Build.VERSION.SDK_INT < 29) return generic
+        val installed = SystemFonts.getAvailableFonts().mapNotNull { font ->
+            val file = font.file ?: return@mapNotNull null
+            val label = file.nameWithoutExtension
+                .replace(Regex("([a-z])([A-Z])"), "$1 $2")
+                .replace(Regex("[-_]+"), " ")
+            FontOption(label, file.absolutePath)
+        }.distinctBy { it.spec }.sortedBy { it.label.lowercase() }
+        return generic + installed
+    }
+
+    fun fontLabel(spec: String) = availableFonts().firstOrNull { it.spec == spec }?.label ?: "System font"
+
+    fun typeface(context: Context, style: Int = Typeface.NORMAL) = typeface(font(context), style)
+
+    fun typeface(spec: String, style: Int = Typeface.NORMAL): Typeface {
+        val base = if (spec.startsWith("/")) runCatching { Typeface.createFromFile(spec) }.getOrNull()
+            else Typeface.create(spec, Typeface.NORMAL)
+        return Typeface.create(base ?: Typeface.MONOSPACE, style)
+    }
+
     fun prepare(activity: Activity) {
         activity.setTheme(if (load(activity).light) R.style.AppThemeLight else R.style.AppTheme)
     }
@@ -83,9 +113,13 @@ object AppTheme {
         activity.window.decorView.post { styleTree(activity.window.decorView, activity) }
     }
 
-    fun previewTypography(view: TextView, font: String, scale: Float) {
+    fun previewTypeface(view: TextView, font: String) {
         previewText[view] = true
-        view.typeface = Typeface.create(font, Typeface.NORMAL)
+        view.typeface = typeface(font, view.typeface?.style ?: Typeface.NORMAL)
+    }
+
+    fun previewTypography(view: TextView, font: String, scale: Float) {
+        previewTypeface(view, font)
         view.textSize = 22f * scale
     }
 
@@ -94,7 +128,7 @@ object AppTheme {
         if (view is TextView && previewText[view] != true) {
             val original = originalTextSizes.getOrPut(view) { view.textSize }
             view.setTextSize(android.util.TypedValue.COMPLEX_UNIT_PX, original * fontScale(context))
-            view.typeface = Typeface.create(font(context), view.typeface?.style ?: Typeface.NORMAL)
+            view.typeface = typeface(context, view.typeface?.style ?: Typeface.NORMAL)
         }
         if (view is ViewGroup) for (index in 0 until view.childCount) styleTree(view.getChildAt(index), context)
     }
