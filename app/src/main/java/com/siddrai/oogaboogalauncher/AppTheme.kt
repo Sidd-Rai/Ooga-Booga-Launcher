@@ -15,7 +15,6 @@ import android.appwidget.AppWidgetHostView
 import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup
-import android.view.ViewTreeObserver
 import android.widget.LinearLayout
 import android.widget.TextView
 import java.util.WeakHashMap
@@ -31,8 +30,12 @@ object AppTheme {
     private const val FONT = "font_family"
     private const val FONT_SCALE = "font_scale"
     private val originalTextSizes = WeakHashMap<TextView, Float>()
-    private val typographyListeners = WeakHashMap<Activity, Boolean>()
+    private val watchedGroups = WeakHashMap<ViewGroup, Boolean>()
     private val previewText = WeakHashMap<TextView, Boolean>()
+    private var cachedFont: String? = null
+    private var cachedFontScale: Float? = null
+    private var cachedFonts: List<FontOption>? = null
+    private val typefaceCache = HashMap<Pair<String, Int>, Typeface>()
 
     var current = create(false, Color.rgb(10, 11, 11), Color.rgb(236, 231, 218))
         private set
@@ -60,18 +63,20 @@ object AppTheme {
         }.start()
     }
 
-    fun font(context: Context) = context.getSharedPreferences(AppStore.PREFS, Context.MODE_PRIVATE)
-        .getString(FONT, "monospace") ?: "monospace"
+    fun font(context: Context): String = cachedFont ?: (context.getSharedPreferences(AppStore.PREFS, Context.MODE_PRIVATE)
+        .getString(FONT, "monospace") ?: "monospace").also { cachedFont = it }
 
-    fun fontScale(context: Context) = context.getSharedPreferences(AppStore.PREFS, Context.MODE_PRIVATE)
-        .getFloat(FONT_SCALE, 1f).coerceIn(.8f, 1.3f)
+    fun fontScale(context: Context): Float = cachedFontScale ?: context.getSharedPreferences(AppStore.PREFS, Context.MODE_PRIVATE)
+        .getFloat(FONT_SCALE, 1f).coerceIn(.8f, 1.3f).also { cachedFontScale = it }
 
     fun saveTypography(context: Context, font: String, scale: Float) {
+        cachedFont = font; cachedFontScale = scale.coerceIn(.8f, 1.3f); typefaceCache.clear()
         context.getSharedPreferences(AppStore.PREFS, Context.MODE_PRIVATE).edit()
             .putString(FONT, font).putFloat(FONT_SCALE, scale.coerceIn(.8f, 1.3f)).apply()
     }
 
     fun availableFonts(): List<FontOption> {
+        cachedFonts?.let { return it }
         val generic = listOf(
             FontOption("Monospace", "monospace"),
             FontOption("Sans Serif", "sans-serif"),
@@ -85,17 +90,17 @@ object AppTheme {
                 .replace(Regex("[-_]+"), " ")
             FontOption(label, file.absolutePath)
         }.distinctBy { it.spec }.sortedBy { it.label.lowercase() }
-        return generic + installed
+        return (generic + installed).also { cachedFonts = it }
     }
 
     fun fontLabel(spec: String) = availableFonts().firstOrNull { it.spec == spec }?.label ?: "System font"
 
     fun typeface(context: Context, style: Int = Typeface.NORMAL) = typeface(font(context), style)
 
-    fun typeface(spec: String, style: Int = Typeface.NORMAL): Typeface {
+    fun typeface(spec: String, style: Int = Typeface.NORMAL): Typeface = typefaceCache.getOrPut(spec to style) {
         val base = if (spec.startsWith("/")) runCatching { Typeface.createFromFile(spec) }.getOrNull()
             else Typeface.create(spec, Typeface.NORMAL)
-        return Typeface.create(base ?: Typeface.MONOSPACE, style)
+        Typeface.create(base ?: Typeface.MONOSPACE, style)
     }
 
     fun prepare(activity: Activity) {
@@ -111,11 +116,7 @@ object AppTheme {
     }
 
     private fun installTypography(activity: Activity) {
-        if (typographyListeners.containsKey(activity)) return
-        val listener = ViewTreeObserver.OnGlobalLayoutListener { styleTree(activity.window.decorView, activity) }
-        typographyListeners[activity] = true
-        activity.window.decorView.viewTreeObserver.addOnGlobalLayoutListener(listener)
-        activity.window.decorView.post { styleTree(activity.window.decorView, activity) }
+        watchTree(activity.window.decorView, activity)
     }
 
     fun previewTypeface(view: TextView, font: String) {
@@ -135,7 +136,16 @@ object AppTheme {
             view.setTextSize(android.util.TypedValue.COMPLEX_UNIT_PX, original * fontScale(context))
             view.typeface = typeface(context, view.typeface?.style ?: Typeface.NORMAL)
         }
-        if (view is ViewGroup) for (index in 0 until view.childCount) styleTree(view.getChildAt(index), context)
+    }
+
+    private fun watchTree(view: View, context: Context) {
+        styleTree(view, context)
+        if (view !is ViewGroup || view is AppWidgetHostView || watchedGroups.put(view, true) != null) return
+        view.setOnHierarchyChangeListener(object : ViewGroup.OnHierarchyChangeListener {
+            override fun onChildViewAdded(parent: View?, child: View?) { child?.let { watchTree(it, context) } }
+            override fun onChildViewRemoved(parent: View?, child: View?) = Unit
+        })
+        for (index in 0 until view.childCount) watchTree(view.getChildAt(index), context)
     }
 
     fun showMenu(activity: Activity, title: String?, actions: Array<String>, onSelect: (Int) -> Unit) {

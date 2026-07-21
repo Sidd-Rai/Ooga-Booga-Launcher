@@ -39,21 +39,24 @@ class TimeLimitService : AccessibilityService() {
                 Intent.ACTION_SCREEN_OFF -> store.markScreenLocked()
                 Intent.ACTION_USER_PRESENT -> {
                     store.resetSessionAfterLock(LOCK_RESET_MS)
-                    if (store.activePackage() == foregroundPackage) store.resumeSession()
+                    if (store.activePackage() == foregroundPackage) { store.resumeSession(); scheduleExpiry() }
                 }
             }
         }
     }
 
-    private val check = object : Runnable {
-        override fun run() {
-            val active = store.activePackage()
-            val expired = store.activeUntil() > 0 && System.currentTimeMillis() >= store.activeUntil()
-            if (active != null && expired && overlay == null && foregroundPackage == active) {
+    private val expiry = Runnable {
+        val active = store.activePackage()
+        if (active != null && foregroundPackage == active && store.activeUntil() > 0L) {
+            if (System.currentTimeMillis() >= store.activeUntil()) {
                 if (store.extensions() >= 3) closeApp("OOPS — out of time") else showTimeUp()
-            }
-            handler.postDelayed(this, 500)
+            } else scheduleExpiry()
         }
+    }
+    private fun scheduleExpiry() {
+        handler.removeCallbacks(expiry)
+        val delay = store.activeUntil() - System.currentTimeMillis()
+        if (delay > 0L && store.activePackage() == foregroundPackage) handler.postDelayed(expiry, delay)
     }
 
     override fun onServiceConnected() {
@@ -66,7 +69,7 @@ class TimeLimitService : AccessibilityService() {
             else registerReceiver(screenReceiver, filter)
             receiverRegistered = true
         }
-        handler.removeCallbacks(check); handler.post(check)
+        scheduleExpiry()
     }
 
     private fun showTimerPrompt(targetPackage: String) {
@@ -126,6 +129,7 @@ class TimeLimitService : AccessibilityService() {
 
     private fun beginTimer(targetPackage: String, minutes: Int) {
         store.beginSession(targetPackage, minutes)
+        scheduleExpiry()
         promptingPackage = null; promptOverlayPackage = null; removeOverlay()
     }
 
@@ -150,7 +154,7 @@ class TimeLimitService : AccessibilityService() {
         })
         card.addView(Button(this).apply {
             text = "Extend timer"; isAllCaps = false
-            setOnClickListener { if (store.extendSession()) removeOverlay() else closeApp("No extensions left") }
+            setOnClickListener { if (store.extendSession()) { scheduleExpiry(); removeOverlay() } else closeApp("No extensions left") }
         })
         card.addView(Button(this).apply { text = "Close app"; isAllCaps = false; setOnClickListener { closeApp(null) } })
         showOverlay(card, .72f)
@@ -194,7 +198,7 @@ class TimeLimitService : AccessibilityService() {
         foregroundPackage = next
         val active = store.activePackage()
         if (active != null) {
-            if (next == active) store.resumeSession() else store.pauseSession()
+            if (next == active) { store.resumeSession(); scheduleExpiry() } else { store.pauseSession(); handler.removeCallbacks(expiry) }
         } else if (next in store.distracting() && promptingPackage != next) {
             promptingPackage = next
             showTimerPrompt(next)
@@ -202,7 +206,7 @@ class TimeLimitService : AccessibilityService() {
     }
     override fun onInterrupt() = Unit
     override fun onDestroy() {
-        removeOverlay(); handler.removeCallbacks(check)
+        removeOverlay(); handler.removeCallbacks(expiry)
         if (receiverRegistered) runCatching { unregisterReceiver(screenReceiver) }
         receiverRegistered = false; super.onDestroy()
     }

@@ -46,6 +46,9 @@ class MainActivity : Activity() {
     private lateinit var widgetHost: AppWidgetHost
     private var activeResizeFrame: ResizableWidgetFrame? = null
     private val widgetFrames = mutableListOf<ResizableWidgetFrame>()
+    private val screenCache = mutableMapOf<Int, View>()
+    private val screenFrameCache = mutableMapOf<Int, List<ResizableWidgetFrame>>()
+    private val screenScrollCache = mutableMapOf<Int, ScrollView>()
     private var deleteTarget: TextView? = null
     private var deleteTargetHovered = false
     private var deleteTargetArmed = false
@@ -156,6 +159,7 @@ class MainActivity : Activity() {
 
     private fun buildPages(keepDrawer: Boolean = false) {
         deleteTarget = null; deleteTargetHovered = false; activeResizeFrame = null
+        screenCache.clear(); screenFrameCache.clear(); screenScrollCache.clear()
         root = FrameLayout(this).apply { setBackgroundColor(BG); clipChildren = false; clipToPadding = false }
         home = screenView(currentScreen)
         drawer = drawerView()
@@ -290,7 +294,6 @@ class MainActivity : Activity() {
             frame.addView(hostView, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
             canvas.addView(frame, FrameLayout.LayoutParams(width, height).apply { leftMargin = initialX; topMargin = initialY })
             resolveWidgetCollision(frame, canvas, availableWidth)
-            persistWidgetFrame(id, frame, availableWidth)
             updateWidgetOptions(id, width, height)
             widgetFrames.add(frame)
             nextY = maxOf(nextY, (frame.layoutParams as FrameLayout.LayoutParams).topMargin + height + dp(12))
@@ -422,12 +425,25 @@ class MainActivity : Activity() {
     }
 
     private fun screenView(position: Int): View {
+        screenCache[position]?.let { cached ->
+            widgetFrames.clear(); widgetFrames.addAll(screenFrameCache[position].orEmpty())
+            screenScrollCache[position]?.let { homeScroll = it }
+            return cached
+        }
         widgetFrames.clear()
-        return when (position) {
+        val created = when (position) {
             -1 -> widgetScreen(AppStore.LEFT_WIDGET_SCREEN)
             1 -> widgetScreen(AppStore.RIGHT_WIDGET_SCREEN)
             else -> homeView()
         }
+        screenCache[position] = created
+        screenFrameCache[position] = widgetFrames.toList()
+        if (::homeScroll.isInitialized) screenScrollCache[position] = homeScroll
+        return created
+    }
+
+    private fun invalidateScreen(position: Int) {
+        screenCache.remove(position); screenFrameCache.remove(position); screenScrollCache.remove(position)
     }
 
     private fun showScreen(target: Int) {
@@ -435,6 +451,8 @@ class MainActivity : Activity() {
         val old = home
         currentScreen = target
         val next = screenView(target)
+        next.animate().cancel(); old.animate().cancel()
+        (next.parent as? ViewGroup)?.removeView(next)
         val direction = if (target > previous) 1f else -1f
         next.translationX = root.width * direction
         root.addView(next, root.indexOfChild(drawer))
@@ -604,6 +622,7 @@ class MainActivity : Activity() {
     }
     private fun refreshHome() {
         if (!::root.isInitialized) return
+        invalidateScreen(currentScreen)
         root.removeView(home)
         home = screenView(currentScreen).apply { visibility = if (drawerOpen) View.GONE else View.VISIBLE }
         root.addView(home, 0)
