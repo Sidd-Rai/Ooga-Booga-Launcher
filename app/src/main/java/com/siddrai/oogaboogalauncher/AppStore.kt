@@ -5,6 +5,7 @@ import android.os.Build
 import android.os.VibrationEffect
 import android.os.Vibrator
 import android.os.VibratorManager
+import android.media.AudioAttributes
 
 data class LaunchableApp(val label: String, val packageName: String)
 
@@ -47,7 +48,9 @@ class AppStore(private val context: Context) {
         val effect = if (deleting)
             VibrationEffect.createWaveform(longArrayOf(0, 28, 34, 48), intArrayOf(0, 150, 0, 255), -1)
         else VibrationEffect.createOneShot(32L, VibrationEffect.DEFAULT_AMPLITUDE)
-        vibrator.vibrate(effect)
+        vibrator.vibrate(effect, AudioAttributes.Builder()
+            .setUsage(AudioAttributes.USAGE_ASSISTANCE_SONIFICATION)
+            .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION).build())
     }
     fun quickLeft(): String? = prefs.getString(QUICK_LEFT, null)
     fun quickRight(): String? = prefs.getString(QUICK_RIGHT, null)

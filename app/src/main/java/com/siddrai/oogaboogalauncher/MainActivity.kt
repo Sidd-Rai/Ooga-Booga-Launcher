@@ -21,6 +21,7 @@ import android.text.Editable
 import android.text.TextWatcher
 import android.text.InputType
 import android.view.Gravity
+import android.view.HapticFeedbackConstants
 import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
@@ -91,17 +92,16 @@ class MainActivity : Activity() {
 
     override fun onNewIntent(intent: Intent?) {
         super.onNewIntent(intent)
-        store.clearSession()
+        AppTheme.dismissMenu(this)
         if (::root.isInitialized) {
-            drawer.animate().cancel()
-            drawer.visibility = View.GONE
-            drawer.translationY = 0f
-            home.visibility = View.VISIBLE
-            drawerOpen = false
+            drawer.animate().cancel(); home.animate().cancel()
+            drawer.visibility = View.GONE; drawer.translationY = 0f; drawerOpen = false
             if (::drawerSearch.isInitialized) drawerSearch.text.clear()
-            if (currentScreen != 0) {
-                root.removeView(home); currentScreen = 0; home = screenView(0); root.addView(home, 0)
-            }
+            (home.parent as? ViewGroup)?.removeView(home)
+            currentScreen = 0; home = screenView(0)
+            (home.parent as? ViewGroup)?.removeView(home)
+            home.animate().cancel(); home.visibility = View.VISIBLE; home.translationX = 0f; home.translationY = 0f
+            root.addView(home, root.indexOfChild(drawer).coerceAtLeast(0))
             hideKeyboard()
         }
         overridePendingTransition(0, 0)
@@ -277,7 +277,7 @@ class MainActivity : Activity() {
                 },
                 onMove = { _, _ ->
                     if (deleteTargetArmed && isOverDeleteTarget(frame)) {
-                        store.performWidgetHaptic(true)
+                        widgetFeedback(frame, true)
                         hideDeleteTarget(); store.removeWidget(id); widgetHost.deleteAppWidgetId(id)
                         root.post { refreshHome() }
                     } else {
@@ -318,7 +318,7 @@ class MainActivity : Activity() {
         if (hovered != deleteTargetHovered) {
             deleteTargetHovered = hovered
             deleteTarget?.animate()?.scaleX(if (hovered) 1.1f else 1f)?.scaleY(if (hovered) 1.1f else 1f)?.setDuration(70)?.start()
-            if (hovered && deleteTargetArmed) store.performWidgetHaptic(false)
+            if (hovered && deleteTargetArmed) widgetFeedback(frame, false)
         }
     }
 
@@ -327,6 +327,14 @@ class MainActivity : Activity() {
         deleteTargetHovered = false; deleteTargetArmed = false
     }
 
+
+    private fun widgetFeedback(view: View, deleting: Boolean) {
+        store.performWidgetHaptic(deleting)
+        view.performHapticFeedback(
+            if (deleting) HapticFeedbackConstants.CONFIRM else HapticFeedbackConstants.CLOCK_TICK,
+            HapticFeedbackConstants.FLAG_IGNORE_GLOBAL_SETTING or HapticFeedbackConstants.FLAG_IGNORE_VIEW_SETTING
+        )
+    }
 
     private fun isOverDeleteTarget(frame: View): Boolean {
         val target = deleteTarget ?: return false
@@ -457,8 +465,8 @@ class MainActivity : Activity() {
         next.translationX = root.width * direction
         root.addView(next, root.indexOfChild(drawer))
         home = next
-        next.animate().translationX(0f).setDuration(100).withLayer().start()
-        old.animate().translationX(-root.width * direction).setDuration(100).withLayer().withEndAction { root.removeView(old) }.start()
+        next.animate().translationX(0f).setDuration(65).withLayer().start()
+        old.animate().translationX(-root.width * direction).setDuration(65).withLayer().withEndAction { root.removeView(old) }.start()
     }
 
     private fun quickButton(app: LaunchableApp?, alignment: Int) = TextView(this).apply {

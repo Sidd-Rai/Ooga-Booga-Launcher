@@ -36,6 +36,7 @@ object AppTheme {
     private var cachedFontScale: Float? = null
     private var cachedFonts: List<FontOption>? = null
     private val typefaceCache = HashMap<Pair<String, Int>, Typeface>()
+    private val activeMenus = WeakHashMap<Activity, AlertDialog>()
 
     var current = create(false, Color.rgb(10, 11, 11), Color.rgb(236, 231, 218))
         private set
@@ -148,6 +149,8 @@ object AppTheme {
         for (index in 0 until view.childCount) watchTree(view.getChildAt(index), context)
     }
 
+    fun dismissMenu(activity: Activity) { activeMenus.remove(activity)?.dismiss() }
+
     fun showMenu(activity: Activity, title: String?, actions: Array<String>, onSelect: (Int) -> Unit) {
         val palette = load(activity)
         val density = activity.resources.displayMetrics.density
@@ -156,7 +159,7 @@ object AppTheme {
             orientation = LinearLayout.VERTICAL
             setPadding(dp(22), dp(20), dp(22), dp(14))
             background = GradientDrawable().apply {
-                setColor(palette.background); cornerRadius = dp(24).toFloat(); setStroke(dp(1), palette.line)
+                setColor(Color.argb(236, Color.red(palette.background), Color.green(palette.background), Color.blue(palette.background))); cornerRadius = dp(24).toFloat(); setStroke(dp(1), palette.line)
             }
         }
         title?.let { label -> card.addView(TextView(activity).apply {
@@ -166,15 +169,23 @@ object AppTheme {
         lateinit var dialog: AlertDialog
         actions.forEach { action -> card.addView(TextView(activity).apply {
             text = action; textSize = 15f; gravity = Gravity.CENTER_VERTICAL; setTextColor(palette.foreground)
-            setPadding(dp(2), 0, dp(2), 0); background = GradientDrawable().apply {
-                setColor(blend(palette.foreground, palette.background, .07f)); cornerRadius = dp(14).toFloat()
+            setPadding(dp(16), 0, dp(16), 0); background = GradientDrawable().apply {
+                setColor(Color.argb(20, Color.red(palette.foreground), Color.green(palette.foreground), Color.blue(palette.foreground))); cornerRadius = dp(14).toFloat()
             }
             setOnClickListener { val index = actions.indexOf(action); dialog.dismiss(); onSelect(index) }
         }, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(50)).apply { bottomMargin = dp(7) }) }
+        dismissMenu(activity)
         dialog = AlertDialog.Builder(activity).setView(card).create()
+        activeMenus[activity] = dialog
+        dialog.setOnDismissListener { if (activeMenus[activity] === dialog) activeMenus.remove(activity) }
         dialog.setOnShowListener {
             dialog.window?.setBackgroundDrawable(ColorDrawable(Color.TRANSPARENT))
-            dialog.window?.setDimAmount(.42f)
+            dialog.window?.setDimAmount(.48f)
+            dialog.window?.setLayout((activity.resources.displayMetrics.widthPixels * .9f).toInt(), android.view.WindowManager.LayoutParams.WRAP_CONTENT)
+            if (Build.VERSION.SDK_INT >= 31) {
+                dialog.window?.addFlags(android.view.WindowManager.LayoutParams.FLAG_BLUR_BEHIND)
+                dialog.window?.attributes = dialog.window?.attributes?.apply { blurBehindRadius = 42 }
+            }
         }
         dialog.show()
     }
