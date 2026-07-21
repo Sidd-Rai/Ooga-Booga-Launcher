@@ -18,6 +18,9 @@ class ThemeEditorActivity : Activity() {
     private lateinit var foregroundInput: EditText
     private lateinit var preview: TextView
     private lateinit var mode: RadioGroup
+    private lateinit var fontMode: RadioGroup
+    private lateinit var fontSize: SeekBar
+    private lateinit var fontSizeLabel: TextView
 
     override fun onCreate(savedInstanceState: Bundle?) {
         AppTheme.prepare(this)
@@ -46,6 +49,33 @@ class ThemeEditorActivity : Activity() {
         root.addView(fieldLabel("FOREGROUND", palette))
         foregroundInput = colourField(palette.foreground, palette)
         root.addView(colourRow(foregroundInput))
+        root.addView(fieldLabel("FONT", palette))
+        fontMode = RadioGroup(this).apply {
+            orientation = RadioGroup.HORIZONTAL
+            listOf(2001 to "monospace", 2002 to "sans-serif", 2003 to "serif").forEach { (viewId, family) ->
+                addView(RadioButton(this@ThemeEditorActivity).apply {
+                    id = viewId
+                    text = when (family) { "sans-serif" -> "Sans"; "serif" -> "Serif"; else -> "Mono" }
+                    setTextColor(palette.foreground)
+                    isChecked = AppTheme.font(this@ThemeEditorActivity) == family
+                })
+            }
+        }
+        root.addView(fontMode)
+        fontSizeLabel = fieldLabel("FONT SIZE  •  ${(AppTheme.fontScale(this) * 100).toInt()}%", palette)
+        root.addView(fontSizeLabel)
+        fontSize = SeekBar(this).apply {
+            max = 50
+            progress = ((AppTheme.fontScale(this@ThemeEditorActivity) - .8f) * 100).toInt()
+            setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+                override fun onProgressChanged(seekBar: SeekBar?, progress: Int, fromUser: Boolean) {
+                    fontSizeLabel.text = "FONT SIZE  •  ${80 + progress}%"; updatePreview()
+                }
+                override fun onStartTrackingTouch(seekBar: SeekBar?) = Unit
+                override fun onStopTrackingTouch(seekBar: SeekBar?) = Unit
+            })
+        }
+        root.addView(fontSize)
         preview = TextView(this).apply {
             text = "12:48\nYour space, your pace."
             textSize = 22f; gravity = Gravity.CENTER; setPadding(dp(16), dp(28), dp(16), dp(28))
@@ -54,11 +84,12 @@ class ThemeEditorActivity : Activity() {
             topMargin = dp(24); bottomMargin = dp(20)
         })
         root.addView(Button(this).apply {
-            text = "Save theme"; isAllCaps = false
+            text = "Save appearance"; isAllCaps = false
             setOnClickListener {
                 val bg = parse(backgroundInput.text.toString()) ?: return@setOnClickListener toast("Invalid background colour")
                 val fg = parse(foregroundInput.text.toString()) ?: return@setOnClickListener toast("Invalid foreground colour")
                 AppTheme.save(this@ThemeEditorActivity, mode.checkedRadioButtonId == 1002, bg, fg)
+                AppTheme.saveTypography(this@ThemeEditorActivity, selectedFont(), .8f + fontSize.progress / 100f)
                 setResult(RESULT_OK)
                 finish()
             }
@@ -69,6 +100,7 @@ class ThemeEditorActivity : Activity() {
             override fun afterTextChanged(s: Editable?) = Unit
         }
         backgroundInput.addTextChangedListener(watcher); foregroundInput.addTextChangedListener(watcher)
+        fontMode.setOnCheckedChangeListener { _, _ -> updatePreview() }
         mode.setOnCheckedChangeListener { _, checkedId ->
             if (checkedId == 1002) {
                 backgroundInput.setText("#F6F4EE"); foregroundInput.setText("#1C1D1C")
@@ -76,7 +108,7 @@ class ThemeEditorActivity : Activity() {
                 backgroundInput.setText("#0A0B0B"); foregroundInput.setText("#ECE7DA")
             }
         }
-        setContentView(root); updatePreview()
+        setContentView(ScrollView(this).apply { isFillViewport = true; addView(root) }); updatePreview()
     }
 
     private fun fieldLabel(label: String, palette: Palette) = TextView(this).apply {
@@ -137,8 +169,10 @@ class ThemeEditorActivity : Activity() {
         val bg = parse(backgroundInput.text.toString()) ?: return
         val fg = parse(foregroundInput.text.toString()) ?: return
         preview.setTextColor(fg)
+        AppTheme.previewTypography(preview, selectedFont(), .8f + fontSize.progress / 100f)
         preview.background = GradientDrawable().apply { setColor(bg); cornerRadius = dp(18).toFloat() }
     }
+    private fun selectedFont() = when (fontMode.checkedRadioButtonId) { 2002 -> "sans-serif"; 2003 -> "serif"; else -> "monospace" }
     private fun parse(value: String): Int? = try { Color.parseColor(value.trim()) } catch (_: IllegalArgumentException) { null }
     private fun toast(text: String) { Toast.makeText(this, text, Toast.LENGTH_SHORT).show() }
     private fun dp(v: Int) = (v * resources.displayMetrics.density).toInt()

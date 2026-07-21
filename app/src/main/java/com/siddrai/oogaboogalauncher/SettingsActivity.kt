@@ -1,8 +1,10 @@
 package com.siddrai.oogaboogalauncher
 
 import android.app.Activity
+import android.app.AlertDialog
 import android.content.Intent
 import android.graphics.Typeface
+import android.net.Uri
 import android.os.Bundle
 import android.provider.Settings
 import android.view.Gravity
@@ -25,10 +27,10 @@ class SettingsActivity : Activity() {
         root.addView(option("HIDDEN APPS") { select("hidden") })
         root.addView(option("DISTRACTING APPS") { select("distracting") })
         root.addView(option("SHUTUP LIST") { select("shutup") })
-        root.addView(option("NOTIFICATION ACCESS") { startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS)) })
-        root.addView(option("TIME-LIMIT SERVICE") { startActivity(Intent(this, AccessibilityHelpActivity::class.java)) })
+        root.addView(option("APP PERMISSIONS") { startActivity(Intent(this, PermissionsActivity::class.java)) })
         root.addView(option("APPEARANCE") { startActivityForResult(Intent(this, ThemeEditorActivity::class.java), 71) })
         root.addView(option("PRIVACY POLICY") { startActivity(Intent(this, PrivacyPolicyActivity::class.java)) })
+        root.addView(option("CHECK FOR UPDATES") { checkForUpdates() })
         setContentView(ScrollView(this).apply {
             isVerticalScrollBarEnabled = false; isFillViewport = true; setBackgroundColor(MainActivity.BG); addView(root)
         })
@@ -40,6 +42,18 @@ class SettingsActivity : Activity() {
             LinearLayout.LayoutParams(0, dp(52), 1f))
         addView(TextView(this@SettingsActivity).apply { text = "›"; textSize = 24f; setTextColor(MainActivity.MUTED) })
     }
+    private fun checkForUpdates() {
+        val version = packageManager.getPackageInfo(packageName, 0).versionName ?: "unknown"
+        val url = Uri.parse("https://sidd-rai.github.io/Ooga-Booga-Launcher/").buildUpon()
+            .appendQueryParameter("version", version).build()
+        AlertDialog.Builder(this)
+            .setTitle("Check for Updates")
+            .setMessage("The launcher can't check.\nIt doesn't have internet.\n\nYour browser, however, does.")
+            .setNegativeButton("CANCEL", null)
+            .setPositiveButton("OPEN UPDATE PAGE") { _, _ -> startActivity(Intent(Intent.ACTION_VIEW, url)) }
+            .show()
+    }
+
     private fun select(mode: String) = startActivity(Intent(this, AppSelectionActivity::class.java).putExtra("mode", mode))
     @Deprecated("Legacy result API keeps this dependency-free")
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {

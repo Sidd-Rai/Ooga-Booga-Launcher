@@ -24,6 +24,7 @@ class WidgetSettingsActivity : Activity() {
     private var pendingId = AppWidgetManager.INVALID_APPWIDGET_ID
     private var pendingNew = false
     private var choosing = false
+    private var directBrowse = false
     private lateinit var screen: String
     private val previewExecutor = Executors.newFixedThreadPool(2)
 
@@ -31,10 +32,11 @@ class WidgetSettingsActivity : Activity() {
         AppTheme.prepare(this); super.onCreate(savedInstanceState); AppTheme.apply(this)
         store = AppStore(this); host = AppWidgetHost(this, HOST_ID)
         screen = intent.getStringExtra("screen") ?: AppStore.MAIN_SCREEN
+        directBrowse = intent.getBooleanExtra(EXTRA_BROWSE, false)
         pendingId = savedInstanceState?.getInt("pending_id", AppWidgetManager.INVALID_APPWIDGET_ID)
             ?: AppWidgetManager.INVALID_APPWIDGET_ID
         pendingNew = savedInstanceState?.getBoolean("pending_new", false) ?: false
-        choosing = savedInstanceState?.getBoolean("choosing", false) ?: false
+        choosing = savedInstanceState?.getBoolean("choosing", directBrowse) ?: directBrowse
         if (choosing) renderGallery() else renderManage()
     }
 
@@ -45,7 +47,7 @@ class WidgetSettingsActivity : Activity() {
 
     @Deprecated("Handles the in-app gallery")
     override fun onBackPressed() {
-        if (choosing) renderManage() else super.onBackPressed()
+        if (choosing && !directBrowse) renderManage() else super.onBackPressed()
     }
 
     private fun renderManage() {
@@ -129,7 +131,10 @@ class WidgetSettingsActivity : Activity() {
         else if (requestCode == EDIT) { pendingId = AppWidgetManager.INVALID_APPWIDGET_ID; renderManage() }
     }
 
-    private fun saveWidget(id: Int) { store.addWidget(id, screen); pendingId = AppWidgetManager.INVALID_APPWIDGET_ID; pendingNew = false; renderManage() }
+    private fun saveWidget(id: Int) {
+        store.addWidget(id, screen); pendingId = AppWidgetManager.INVALID_APPWIDGET_ID; pendingNew = false
+        if (directBrowse) { setResult(RESULT_OK); finish() } else renderManage()
+    }
 
     private fun widgetMenu(id: Int, info: AppWidgetProviderInfo?) {
         val actions = if (info?.configure != null) arrayOf("Configure", "Remove") else arrayOf("Remove")
@@ -215,5 +220,9 @@ class WidgetSettingsActivity : Activity() {
     private fun dp(v: Int) = (v * resources.displayMetrics.density).toInt()
     override fun onDestroy() { previewExecutor.shutdownNow(); super.onDestroy() }
 
-    companion object { const val HOST_ID = 7401; private const val BIND = 81; private const val CONFIGURE = 82; private const val EDIT = 83 }
+    companion object {
+        const val HOST_ID = 7401
+        const val EXTRA_BROWSE = "browse"
+        private const val BIND = 81; private const val CONFIGURE = 82; private const val EDIT = 83
+    }
 }

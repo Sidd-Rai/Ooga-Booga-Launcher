@@ -17,6 +17,7 @@ class AppSelectionActivity : Activity() {
     private lateinit var store: AppStore
     private lateinit var mode: String
     private lateinit var selected: MutableSet<String>
+    private lateinit var originalSelection: Set<String>
     private var editing = true
     private var query = ""
 
@@ -31,10 +32,9 @@ class AppSelectionActivity : Activity() {
             "shutup" -> store.shutUp().toMutableSet()
             else -> store.pinned().toMutableSet()
         }
+        originalSelection = selected.toSet()
         render()
     }
-
-    override fun onPause() { saveSelection(); super.onPause() }
 
     private fun saveSelection() {
         when (mode) {
@@ -66,13 +66,12 @@ class AppSelectionActivity : Activity() {
         header.addView(TextView(this).apply {
             text = title; textSize = 25f; typeface = Typeface.create(Typeface.SERIF, Typeface.BOLD); setTextColor(MainActivity.INK)
         }, LinearLayout.LayoutParams(0, dp(46), 1f))
-        if (mode == "hidden") header.addView(action(if (editing) "DONE" else "EDIT") {
-            if (editing) saveSelection()
-            editing = !editing; render()
+        if (mode == "hidden" && !editing) header.addView(action("EDIT") {
+            originalSelection = selected.toSet(); editing = true; render()
         })
         root.addView(header)
         root.addView(TextView(this).apply {
-            text = if (mode == "hidden" && !editing) "TAP TO OPEN  •  HOLD FOR OPTIONS" else "TAP TO TOGGLE  •  SAVED AUTOMATICALLY"
+            text = if (mode == "hidden" && !editing) "TAP TO OPEN  •  HOLD FOR OPTIONS" else "CHANGES ARE APPLIED ONLY WHEN SAVED"
             textSize = 9f; letterSpacing = .1f; setTextColor(MainActivity.MUTED); setPadding(0, dp(3), 0, dp(8))
         })
 
@@ -109,8 +108,21 @@ class AppSelectionActivity : Activity() {
         populate(query)
         root.addView(ScrollView(this).apply { isVerticalScrollBarEnabled = false; addView(rows) },
             LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f))
+        if (editing) root.addView(LinearLayout(this).apply {
+            gravity = Gravity.RIGHT or Gravity.CENTER_VERTICAL
+            addView(action("CANCEL") { cancelChanges() })
+            addView(action("SAVE") { saveSelection(); originalSelection = selected.toSet(); if (mode == "hidden") { editing = false; render() } else finish() })
+        }, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(54)))
         setContentView(root)
     }
+
+    private fun cancelChanges() {
+        selected.clear(); selected.addAll(originalSelection)
+        if (mode == "hidden") { editing = false; render() } else finish()
+    }
+
+    @Deprecated("Back discards staged checklist changes")
+    override fun onBackPressed() { if (editing) cancelChanges() else super.onBackPressed() }
 
     private fun checkRow(app: LaunchableApp) = CheckBox(this).apply {
         text = app.label; textSize = 15f; gravity = Gravity.CENTER_VERTICAL; setTextColor(MainActivity.INK)

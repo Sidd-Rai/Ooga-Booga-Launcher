@@ -17,12 +17,13 @@ class ResizableWidgetFrame(
     private val maximumHeight: Int,
     private val onEditStart: (ResizableWidgetFrame) -> Unit,
     private val onResize: (width: Int, height: Int, finished: Boolean) -> Unit,
-    private val onMove: (offsetX: Float, offsetY: Float) -> Unit
+    private val onMove: (offsetX: Float, offsetY: Float) -> Unit,
+    private val onRemove: () -> Unit
 ) : FrameLayout(context) {
     private val paint = Paint(Paint.ANTI_ALIAS_FLAG)
-    private val handle = dp(9).toFloat(); private val hit = dp(32).toFloat()
+    private val handle = dp(7).toFloat(); private val hit = dp(18).toFloat()
     private val handler = Handler(Looper.getMainLooper()); private val slop = ViewConfiguration.get(context).scaledTouchSlop
-    private var editing = false; private var moving = false
+    private var editing = false; private var moving = false; private var removePressed = false
     private var left = false; private var right = false; private var top = false; private var bottom = false
     private var startX = 0f; private var startY = 0f; private var startWidth = 0; private var startHeight = 0
     private var startTranslationX = 0f; private var startTranslationY = 0f
@@ -63,6 +64,8 @@ class ResizableWidgetFrame(
         if (!editing) return true
         when (event.actionMasked) {
             MotionEvent.ACTION_DOWN -> {
+                removePressed = event.x >= width - dp(46) && event.y <= dp(46)
+                if (removePressed) { parent?.requestDisallowInterceptTouchEvent(true); return true }
                 left = event.x <= hit; right = event.x >= width - hit; top = event.y <= hit; bottom = event.y >= height - hit
                 moving = !left && !right && !top && !bottom
                 startX = event.rawX; startY = event.rawY; startWidth = width; startHeight = height
@@ -70,6 +73,7 @@ class ResizableWidgetFrame(
                 parent?.requestDisallowInterceptTouchEvent(true)
             }
             MotionEvent.ACTION_MOVE -> {
+                if (removePressed) return true
                 val dx = event.rawX - startX; val dy = event.rawY - startY
                 if (moving) {
                     translationX = startTranslationX + dx
@@ -86,6 +90,10 @@ class ResizableWidgetFrame(
                 }
             }
             MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
+                if (removePressed) {
+                    val remove = event.actionMasked == MotionEvent.ACTION_UP && event.x >= width - dp(54) && event.y <= dp(54)
+                    removePressed = false; if (remove) { onRemove(); return true }
+                }
                 if (moving) onMove(translationX, translationY)
                 else onResize(width, height, true)
                 parent?.requestDisallowInterceptTouchEvent(false)
@@ -102,6 +110,10 @@ class ResizableWidgetFrame(
         paint.style = Paint.Style.FILL; paint.color = AppTheme.current.background
         points.forEach { canvas.drawCircle(it.first, it.second, handle + dp(2), paint) }
         paint.color = AppTheme.current.foreground; points.forEach { canvas.drawCircle(it.first, it.second, handle, paint) }
+        paint.color = AppTheme.current.background; canvas.drawCircle(width - dp(20f), dp(20f), dp(15f), paint)
+        paint.color = AppTheme.current.foreground; paint.textAlign = Paint.Align.CENTER; paint.textSize = dp(22f)
+        canvas.drawText("×", width - dp(20f), dp(27f), paint); paint.textAlign = Paint.Align.LEFT
     }
     private fun dp(v: Int) = (v * resources.displayMetrics.density).toInt()
+    private fun dp(v: Float) = v * resources.displayMetrics.density
 }

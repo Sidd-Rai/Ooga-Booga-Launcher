@@ -15,10 +15,15 @@
         <activity
             android:name=".TimerPromptActivity"
             android:excludeFromRecents="true"
+            android:theme="@style/TimerPromptTheme"
             android:exported="false" />
 
         <activity
             android:name=".AccessibilityHelpActivity"
+            android:exported="false" />
+
+        <activity
+            android:name=".PermissionsActivity"
             android:exported="false" />
 
         <activity

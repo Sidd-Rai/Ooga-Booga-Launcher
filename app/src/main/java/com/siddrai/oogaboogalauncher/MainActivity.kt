@@ -228,6 +228,7 @@ class MainActivity : Activity() {
             addView(quickButton(left, Gravity.LEFT), LinearLayout.LayoutParams(0, dp(52), 1f))
             addView(quickButton(right, Gravity.RIGHT), LinearLayout.LayoutParams(0, dp(52), 1f))
         })
+        installScreenLongPress(column, content, AppStore.MAIN_SCREEN)
         return column
     }
 
@@ -266,6 +267,10 @@ class MainActivity : Activity() {
                     resolveWidgetCollision(frame, canvas, availableWidth)
                     persistWidgetFrame(id, frame, availableWidth)
                     updateCanvasHeight(canvas, screen)
+                },
+                onRemove = {
+                    store.removeWidget(id); widgetHost.deleteAppWidgetId(id)
+                    root.post { refreshHome() }
                 }
             )
             frame.addView(hostView, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
@@ -345,7 +350,23 @@ class MainActivity : Activity() {
         })
         homeScroll = ScrollView(this).apply { isVerticalScrollBarEnabled = false; clipChildren = false; addView(content) }
         column.addView(homeScroll, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f))
+        installScreenLongPress(column, content, screen)
         return column
+    }
+
+    private fun installScreenLongPress(column: View, content: View, screen: String) {
+        val listener = View.OnLongClickListener { showScreenMenu(screen); true }
+        listOf(column, content, homeScroll).forEach { view ->
+            view.setOnLongClickListener(listener); view.isLongClickable = true
+        }
+    }
+
+    private fun showScreenMenu(screen: String) {
+        AlertDialog.Builder(this).setItems(arrayOf("Widgets", "Appearance")) { _, index ->
+            if (index == 0) startActivityForResult(Intent(this, WidgetSettingsActivity::class.java)
+                .putExtra("screen", screen).putExtra(WidgetSettingsActivity.EXTRA_BROWSE, true), 73)
+            else startActivityForResult(Intent(this, ThemeEditorActivity::class.java), 72)
+        }.show()
     }
 
     private fun screenView(position: Int): View {
@@ -541,6 +562,8 @@ class MainActivity : Activity() {
     @Deprecated("Legacy result API keeps this dependency-free")
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
+        if (requestCode == 72 && resultCode == RESULT_OK) recreate()
+        if (requestCode == 73 && resultCode == RESULT_OK) refreshHome()
         if (requestCode == 55) {
             val newTheme = AppTheme.load(this)
             if (newTheme.light != settingsThemeWasLight) recreate()

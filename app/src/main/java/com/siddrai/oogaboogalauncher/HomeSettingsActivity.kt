@@ -27,15 +27,10 @@ class HomeSettingsActivity : Activity() {
         root.addView(option("HOME SCREEN APPS") { selectApps() })
         root.addView(toggle("CLOCK", store.showClock()) { store.setShowClock(it) })
         root.addView(option("BOTTOM SHORTCUTS") { startActivity(Intent(this, QuickAppsActivity::class.java)) })
-        root.addView(option("HOME WIDGETS") { widgets(AppStore.MAIN_SCREEN) })
         root.addView(toggle("LEFT WIDGET SCREEN", store.leftScreen()) { store.setLeftScreen(it); render() })
-        if (store.leftScreen()) root.addView(option("EDIT LEFT SCREEN") { widgets(AppStore.LEFT_WIDGET_SCREEN) })
         root.addView(toggle("RIGHT WIDGET SCREEN", store.rightScreen()) { store.setRightScreen(it); render() })
-        if (store.rightScreen()) root.addView(option("EDIT RIGHT SCREEN") { widgets(AppStore.RIGHT_WIDGET_SCREEN) })
         setContentView(ScrollView(this).apply { isFillViewport = true; setBackgroundColor(MainActivity.BG); addView(root) })
     }
-
-    private fun widgets(screen: String) = startActivity(Intent(this, WidgetSettingsActivity::class.java).putExtra("screen", screen))
     private fun selectApps() = startActivity(Intent(this, AppSelectionActivity::class.java).putExtra("mode", "pinned"))
     private fun option(title: String, action: () -> Unit) = LinearLayout(this).apply {
         gravity = Gravity.CENTER_VERTICAL; setOnClickListener { action() }
