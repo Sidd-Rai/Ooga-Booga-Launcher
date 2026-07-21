@@ -14,14 +14,17 @@ import android.graphics.Rect
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
 import android.graphics.drawable.ColorDrawable
+import android.os.Build
 import android.os.Bundle
+import android.os.VibrationEffect
+import android.os.Vibrator
+import android.os.VibratorManager
 import android.net.Uri
 import android.provider.Settings
 import android.text.Editable
 import android.text.TextWatcher
 import android.text.InputType
 import android.view.Gravity
-import android.view.HapticFeedbackConstants
 import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
@@ -49,6 +52,7 @@ class MainActivity : Activity() {
     private val widgetFrames = mutableListOf<ResizableWidgetFrame>()
     private var deleteTarget: TextView? = null
     private var deleteTargetHovered = false
+    private var deleteTargetArmed = false
     private var screenLongPressAllowed = false
     private var suppressLauncherGesture = false
     private var gestureStartedOnWidget = false
@@ -272,8 +276,8 @@ class MainActivity : Activity() {
                     updateCanvasHeight(canvas, screen)
                 },
                 onMove = { _, _ ->
-                    if (isOverDeleteTarget(frame)) {
-                        if (store.widgetDeleteHaptics()) deleteTarget?.performHapticFeedback(HapticFeedbackConstants.CONFIRM)
+                    if (deleteTargetArmed && isOverDeleteTarget(frame)) {
+                        widgetHaptic(true)
                         hideDeleteTarget(); store.removeWidget(id); widgetHost.deleteAppWidgetId(id)
                         root.post { refreshHome() }
                     } else {
@@ -305,21 +309,36 @@ class MainActivity : Activity() {
             text = "×  REMOVE"; textSize = 12f; letterSpacing = .08f; gravity = Gravity.CENTER; setTextColor(INK)
             background = GradientDrawable().apply { setColor(BG); cornerRadius = dp(18).toFloat(); setStroke(dp(1), INK) }
         }
-        deleteTargetHovered = false; deleteTarget = target
+        deleteTargetHovered = false; deleteTargetArmed = false; deleteTarget = target
         root.addView(target, FrameLayout.LayoutParams(dp(132), dp(44), Gravity.TOP or Gravity.CENTER_HORIZONTAL).apply { topMargin = dp(10) })
     }
 
     private fun updateDeleteTargetFeedback(frame: View) {
         val hovered = isOverDeleteTarget(frame)
+        if (!hovered) deleteTargetArmed = true
         if (hovered != deleteTargetHovered) {
             deleteTargetHovered = hovered
             deleteTarget?.animate()?.scaleX(if (hovered) 1.1f else 1f)?.scaleY(if (hovered) 1.1f else 1f)?.setDuration(70)?.start()
-            if (hovered && store.widgetDeleteHaptics()) deleteTarget?.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
+            if (hovered && deleteTargetArmed) widgetHaptic(false)
         }
     }
 
     private fun hideDeleteTarget() {
-        deleteTarget?.animate()?.cancel(); deleteTarget?.let { root.removeView(it) }; deleteTarget = null; deleteTargetHovered = false
+        deleteTarget?.animate()?.cancel(); deleteTarget?.let { root.removeView(it) }; deleteTarget = null
+        deleteTargetHovered = false; deleteTargetArmed = false
+    }
+
+    private fun widgetHaptic(deleting: Boolean) {
+        if (!store.widgetDeleteHaptics()) return
+        val vibrator = if (Build.VERSION.SDK_INT >= 31)
+            getSystemService(VibratorManager::class.java).defaultVibrator
+        else (getSystemService(VIBRATOR_SERVICE) as Vibrator)
+        if (!vibrator.hasVibrator()) return
+        if (Build.VERSION.SDK_INT >= 29) vibrator.vibrate(VibrationEffect.createPredefined(
+            if (deleting) VibrationEffect.EFFECT_HEAVY_CLICK else VibrationEffect.EFFECT_TICK
+        )) else if (Build.VERSION.SDK_INT >= 26) vibrator.vibrate(VibrationEffect.createOneShot(
+            if (deleting) 45L else 18L, if (deleting) 190 else 90
+        )) else vibrator.vibrate(if (deleting) 45L else 18L)
     }
 
     private fun isOverDeleteTarget(frame: View): Boolean {
@@ -514,6 +533,10 @@ class MainActivity : Activity() {
 
     private fun open(app: LaunchableApp) {
         if (app.packageName !in store.distracting()) return launch(app.packageName)
+        if (store.hasUsableSession(app.packageName)) {
+            store.resumeSession()
+            return launch(app.packageName)
+        }
         val box = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL; setPadding(dp(24), dp(22), dp(24), dp(14))
             background = GradientDrawable().apply {

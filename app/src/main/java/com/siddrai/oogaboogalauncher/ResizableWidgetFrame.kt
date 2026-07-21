@@ -25,6 +25,7 @@ class ResizableWidgetFrame(
     private val handle = dp(7).toFloat(); private val hit = dp(18).toFloat()
     private val handler = Handler(Looper.getMainLooper()); private val slop = ViewConfiguration.get(context).scaledTouchSlop
     private var editing = false; private var moving = false
+    private var moved = false
     private var left = false; private var right = false; private var top = false; private var bottom = false
     private var startX = 0f; private var startY = 0f; private var startWidth = 0; private var startHeight = 0
     private var startTranslationX = 0f; private var startTranslationY = 0f
@@ -39,7 +40,7 @@ class ResizableWidgetFrame(
         return x >= location[0] && x <= location[0] + width && y >= location[1] && y <= location[1] + height
     }
     fun beginResize() {
-        editing = true; moving = true; startX = rawTouchX; startY = rawTouchY; startWidth = width; startHeight = height
+        editing = true; moving = true; moved = false; startX = rawTouchX; startY = rawTouchY; startWidth = width; startHeight = height
         startTranslationX = translationX; startTranslationY = translationY
         onEditStart(this); parent?.requestDisallowInterceptTouchEvent(true); invalidate()
     }
@@ -74,9 +75,10 @@ class ResizableWidgetFrame(
             MotionEvent.ACTION_MOVE -> {
                 val dx = event.rawX - startX; val dy = event.rawY - startY
                 if (moving) {
+                    if (abs(dx) > slop || abs(dy) > slop) moved = true
                     translationX = startTranslationX + dx
                     translationY = startTranslationY + dy
-                    onMoveProgress()
+                    if (moved) onMoveProgress()
                 } else {
                     val nextWidth = when { right -> startWidth + dx.toInt(); left -> startWidth - dx.toInt(); else -> startWidth }
                         .coerceIn(dp(120), maximumWidth)
@@ -89,7 +91,7 @@ class ResizableWidgetFrame(
                 }
             }
             MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
-                if (moving) onMove(translationX, translationY)
+                if (moving && moved) onMove(translationX, translationY)
                 else onResize(width, height, true)
                 parent?.requestDisallowInterceptTouchEvent(false)
             }

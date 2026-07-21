@@ -91,6 +91,12 @@ class AppStore(private val context: Context) {
         .remove(ACTIVE_DURATION).remove(ACTIVE_EXTENSIONS).remove(ACTIVE_REMAINING).apply()
     fun activePackage(): String? = prefs.getString(ACTIVE_PACKAGE, null)
     fun activeUntil(): Long = prefs.getLong(ACTIVE_UNTIL, 0L)
+    fun hasUsableSession(packageName: String): Boolean {
+        if (activePackage() != packageName) return false
+        val running = activeUntil() - System.currentTimeMillis()
+        val paused = prefs.getLong(ACTIVE_REMAINING, 0L)
+        return running > 0L || paused > 0L
+    }
     fun pauseSession() {
         val until = activeUntil()
         if (until > 0) prefs.edit().putLong(ACTIVE_REMAINING, (until - System.currentTimeMillis()).coerceAtLeast(0))
@@ -103,6 +109,12 @@ class AppStore(private val context: Context) {
             prefs.edit().putLong(ACTIVE_UNTIL, System.currentTimeMillis() + remaining)
             .remove(ACTIVE_REMAINING).apply()
         }
+    }
+    fun markScreenLocked() { pauseSession(); prefs.edit().putLong(SCREEN_LOCKED_AT, System.currentTimeMillis()).apply() }
+    fun resetSessionAfterLock(timeoutMs: Long) {
+        val lockedAt = prefs.getLong(SCREEN_LOCKED_AT, 0L)
+        if (lockedAt > 0L && System.currentTimeMillis() - lockedAt >= timeoutMs) clearSession()
+        prefs.edit().remove(SCREEN_LOCKED_AT).apply()
     }
     fun extensions() = prefs.getInt(ACTIVE_EXTENSIONS, 0)
     fun extendSession(): Boolean {
@@ -125,6 +137,7 @@ class AppStore(private val context: Context) {
         private const val ACTIVE_DURATION = "active_duration"
         private const val ACTIVE_EXTENSIONS = "active_extensions"
         private const val ACTIVE_REMAINING = "active_remaining"
+        private const val SCREEN_LOCKED_AT = "screen_locked_at"
         private const val SHOW_CLOCK = "show_clock"
         private const val WIDGET_DELETE_HAPTICS = "widget_delete_haptics"
         private const val QUICK_LEFT = "quick_left"

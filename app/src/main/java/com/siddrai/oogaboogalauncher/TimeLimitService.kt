@@ -1,10 +1,15 @@
 package com.siddrai.oogaboogalauncher
 
 import android.accessibilityservice.AccessibilityService
+import android.content.BroadcastReceiver
+import android.content.Context
+import android.content.Intent
+import android.content.IntentFilter
 import android.graphics.Color
 import android.graphics.PixelFormat
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
+import android.os.Build
 import android.os.Handler
 import android.os.Looper
 import android.text.InputType
@@ -27,6 +32,18 @@ class TimeLimitService : AccessibilityService() {
     private var promptingPackage: String? = null
     private var promptOverlayPackage: String? = null
     private var overlay: View? = null
+    private var receiverRegistered = false
+    private val screenReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context?, intent: Intent?) {
+            when (intent?.action) {
+                Intent.ACTION_SCREEN_OFF -> store.markScreenLocked()
+                Intent.ACTION_USER_PRESENT -> {
+                    store.resetSessionAfterLock(LOCK_RESET_MS)
+                    if (store.activePackage() == foregroundPackage) store.resumeSession()
+                }
+            }
+        }
+    }
 
     private val check = object : Runnable {
         override fun run() {
@@ -40,7 +57,16 @@ class TimeLimitService : AccessibilityService() {
     }
 
     override fun onServiceConnected() {
-        store = AppStore(this); handler.removeCallbacks(check); handler.post(check)
+        store = AppStore(this)
+        if (!receiverRegistered) {
+            val filter = IntentFilter().apply {
+                addAction(Intent.ACTION_SCREEN_OFF); addAction(Intent.ACTION_USER_PRESENT)
+            }
+            if (Build.VERSION.SDK_INT >= 33) registerReceiver(screenReceiver, filter, RECEIVER_NOT_EXPORTED)
+            else registerReceiver(screenReceiver, filter)
+            receiverRegistered = true
+        }
+        handler.removeCallbacks(check); handler.post(check)
     }
 
     private fun showTimerPrompt(targetPackage: String) {
@@ -175,6 +201,11 @@ class TimeLimitService : AccessibilityService() {
         }
     }
     override fun onInterrupt() = Unit
-    override fun onDestroy() { removeOverlay(); handler.removeCallbacks(check); super.onDestroy() }
+    override fun onDestroy() {
+        removeOverlay(); handler.removeCallbacks(check)
+        if (receiverRegistered) runCatching { unregisterReceiver(screenReceiver) }
+        receiverRegistered = false; super.onDestroy()
+    }
     private fun dp(value: Int) = (value * resources.displayMetrics.density).toInt()
+    companion object { private const val LOCK_RESET_MS = 2 * 60_000L }
 }
