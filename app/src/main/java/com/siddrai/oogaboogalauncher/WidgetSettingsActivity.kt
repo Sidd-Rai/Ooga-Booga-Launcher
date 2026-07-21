@@ -1,5 +1,6 @@
 package com.siddrai.oogaboogalauncher
 
+import android.annotation.SuppressLint
 import android.app.Activity
 import android.app.AlertDialog
 import android.appwidget.AppWidgetHost
@@ -37,6 +38,8 @@ class WidgetSettingsActivity : Activity() {
             ?: AppWidgetManager.INVALID_APPWIDGET_ID
         pendingNew = savedInstanceState?.getBoolean("pending_new", false) ?: false
         choosing = savedInstanceState?.getBoolean("choosing", directBrowse) ?: directBrowse
+        if (android.os.Build.VERSION.SDK_INT >= 33) onBackInvokedDispatcher.registerOnBackInvokedCallback(
+            android.window.OnBackInvokedDispatcher.PRIORITY_DEFAULT) { handleBack() }
         if (choosing) renderGallery() else renderManage()
     }
 
@@ -45,10 +48,11 @@ class WidgetSettingsActivity : Activity() {
         outState.putBoolean("choosing", choosing); super.onSaveInstanceState(outState)
     }
 
-    @Deprecated("Handles the in-app gallery")
-    override fun onBackPressed() {
-        if (choosing && !directBrowse) renderManage() else super.onBackPressed()
-    }
+    private fun handleBack() { if (choosing && !directBrowse) renderManage() else finish() }
+
+    @SuppressLint("GestureBackNavigation")
+    @Deprecated("Back handling for Android 12 and earlier")
+    override fun onBackPressed() = handleBack()
 
     private fun renderManage() {
         choosing = false

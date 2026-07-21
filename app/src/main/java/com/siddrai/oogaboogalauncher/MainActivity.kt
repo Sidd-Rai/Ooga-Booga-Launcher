@@ -1,5 +1,6 @@
 package com.siddrai.oogaboogalauncher
 
+import android.annotation.SuppressLint
 import android.app.Activity
 import android.app.AlertDialog
 import android.app.role.RoleManager
@@ -107,6 +108,7 @@ class MainActivity : Activity() {
         overridePendingTransition(0, 0)
     }
 
+    @SuppressLint("GestureBackNavigation")
     @Deprecated("Handled for the drawer")
     override fun onBackPressed() {
         if (drawerOpen) showHome()

@@ -10,6 +10,7 @@ import android.text.Editable
 import android.text.InputFilter
 import android.text.TextWatcher
 import android.view.Gravity
+import android.view.View
 import android.view.ViewGroup
 import android.widget.*
 
@@ -22,6 +23,8 @@ class ThemeEditorActivity : Activity() {
     private var selectedFont = "monospace"
     private lateinit var fontSize: SeekBar
     private lateinit var fontSizeLabel: TextView
+    private val darkModeId = View.generateViewId()
+    private val lightModeId = View.generateViewId()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         AppTheme.prepare(this)
@@ -37,8 +40,8 @@ class ThemeEditorActivity : Activity() {
         })
         mode = RadioGroup(this).apply {
             orientation = RadioGroup.HORIZONTAL
-            addView(RadioButton(this@ThemeEditorActivity).apply { id = 1001; text = "Dark"; setTextColor(palette.foreground); isChecked = !palette.light })
-            addView(RadioButton(this@ThemeEditorActivity).apply { id = 1002; text = "Light"; setTextColor(palette.foreground); isChecked = palette.light })
+            addView(RadioButton(this@ThemeEditorActivity).apply { id = darkModeId; text = "Dark"; setTextColor(palette.foreground); isChecked = !palette.light })
+            addView(RadioButton(this@ThemeEditorActivity).apply { id = lightModeId; text = "Light"; setTextColor(palette.foreground); isChecked = palette.light })
         }
         root.addView(mode)
         root.addView(fieldLabel("BACKGROUND", palette))
@@ -80,7 +83,7 @@ class ThemeEditorActivity : Activity() {
             setOnClickListener {
                 val bg = parse(backgroundInput.text.toString()) ?: return@setOnClickListener toast("Invalid background colour")
                 val fg = parse(foregroundInput.text.toString()) ?: return@setOnClickListener toast("Invalid foreground colour")
-                AppTheme.save(this@ThemeEditorActivity, mode.checkedRadioButtonId == 1002, bg, fg)
+                AppTheme.save(this@ThemeEditorActivity, mode.checkedRadioButtonId == lightModeId, bg, fg)
                 AppTheme.saveTypography(this@ThemeEditorActivity, selectedFont, .8f + fontSize.progress / 100f)
                 setResult(RESULT_OK)
                 finish()
@@ -93,7 +96,7 @@ class ThemeEditorActivity : Activity() {
         }
         backgroundInput.addTextChangedListener(watcher); foregroundInput.addTextChangedListener(watcher)
         mode.setOnCheckedChangeListener { _, checkedId ->
-            if (checkedId == 1002) {
+            if (checkedId == lightModeId) {
                 backgroundInput.setText("#F6F4EE"); foregroundInput.setText("#1C1D1C")
             } else {
                 backgroundInput.setText("#0A0B0B"); foregroundInput.setText("#ECE7DA")

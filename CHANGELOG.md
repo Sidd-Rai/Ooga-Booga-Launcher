@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.2.1 — 2026-07-21
+
+- Fixed cached left and right widget screens appearing blank after opening the app drawer and pressing Home
+- Normalized cached screen visibility, opacity, and translation before reuse
+
 ## 1.2.0 — 2026-07-21
 
 - Added configurable system fonts and font sizing with live previews

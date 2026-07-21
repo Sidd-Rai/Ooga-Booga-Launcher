@@ -1,5 +1,6 @@
 package com.siddrai.oogaboogalauncher
 
+import android.annotation.SuppressLint
 import android.app.Activity
 import android.app.AlertDialog
 import android.content.Intent
@@ -33,6 +34,8 @@ class AppSelectionActivity : Activity() {
             else -> store.pinned().toMutableSet()
         }
         originalSelection = selected.toSet()
+        if (android.os.Build.VERSION.SDK_INT >= 33) onBackInvokedDispatcher.registerOnBackInvokedCallback(
+            android.window.OnBackInvokedDispatcher.PRIORITY_DEFAULT) { handleBack() }
         render()
     }
 
@@ -116,8 +119,11 @@ class AppSelectionActivity : Activity() {
         if (mode == "hidden") { editing = false; render() } else finish()
     }
 
-    @Deprecated("Back discards staged checklist changes")
-    override fun onBackPressed() { if (editing) cancelChanges() else super.onBackPressed() }
+    private fun handleBack() { if (editing) cancelChanges() else finish() }
+
+    @SuppressLint("GestureBackNavigation")
+    @Deprecated("Back handling for Android 12 and earlier")
+    override fun onBackPressed() = handleBack()
 
     private fun checkRow(app: LaunchableApp) = CheckBox(this).apply {
         text = app.label; textSize = 15f; gravity = Gravity.CENTER_VERTICAL; setTextColor(MainActivity.INK)
