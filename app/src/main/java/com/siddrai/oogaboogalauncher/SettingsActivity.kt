@@ -28,6 +28,7 @@ class SettingsActivity : Activity() {
         root.addView(option("HIDDEN APPS") { select("hidden") })
         root.addView(option("DISTRACTING APPS") { select("distracting") })
         root.addView(option("SHUTUP LIST") { select("shutup") })
+        root.addView(option("HAPTICS") { startActivity(Intent(this, HapticsActivity::class.java)) })
         root.addView(option("APP PERMISSIONS") { startActivity(Intent(this, PermissionsActivity::class.java)) })
         root.addView(option("APPEARANCE") { startActivityForResult(Intent(this, ThemeEditorActivity::class.java), 71) })
         root.addView(option("PRIVACY POLICY") { startActivity(Intent(this, PrivacyPolicyActivity::class.java)) })

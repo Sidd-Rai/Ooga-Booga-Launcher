@@ -8,6 +8,7 @@ import android.os.VibratorManager
 import android.media.AudioAttributes
 
 data class LaunchableApp(val label: String, val packageName: String)
+enum class HapticKind { WIDGET_HOVER, WIDGET_DELETE, WIDGET_RESIZE, NAVIGATION, ACTION, CHECKBOX }
 
 class AppStore(private val context: Context) {
     private val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
@@ -37,21 +38,48 @@ class AppStore(private val context: Context) {
     fun setShutUp(values: Set<String>) = prefs.edit().putStringSet(SHUT_UP, values).apply()
     fun showClock() = prefs.getBoolean(SHOW_CLOCK, true)
     fun setShowClock(value: Boolean) = prefs.edit().putBoolean(SHOW_CLOCK, value).apply()
+    fun hapticsEnabled() = prefs.getBoolean(HAPTICS_ENABLED, true)
+    fun setHapticsEnabled(value: Boolean) = prefs.edit().putBoolean(HAPTICS_ENABLED, value).apply()
+    fun widgetHoverHaptics() = prefs.getBoolean(WIDGET_HOVER_HAPTICS, true)
+    fun setWidgetHoverHaptics(value: Boolean) = prefs.edit().putBoolean(WIDGET_HOVER_HAPTICS, value).apply()
     fun widgetDeleteHaptics() = prefs.getBoolean(WIDGET_DELETE_HAPTICS, true)
     fun setWidgetDeleteHaptics(value: Boolean) = prefs.edit().putBoolean(WIDGET_DELETE_HAPTICS, value).apply()
-    fun performWidgetHaptic(deleting: Boolean) {
-        if (!widgetDeleteHaptics()) return
+    fun widgetResizeHaptics() = prefs.getBoolean(WIDGET_RESIZE_HAPTICS, true)
+    fun setWidgetResizeHaptics(value: Boolean) = prefs.edit().putBoolean(WIDGET_RESIZE_HAPTICS, value).apply()
+    fun navigationHaptics() = prefs.getBoolean(NAVIGATION_HAPTICS, true)
+    fun setNavigationHaptics(value: Boolean) = prefs.edit().putBoolean(NAVIGATION_HAPTICS, value).apply()
+    fun actionHaptics() = prefs.getBoolean(ACTION_HAPTICS, true)
+    fun setActionHaptics(value: Boolean) = prefs.edit().putBoolean(ACTION_HAPTICS, value).apply()
+    fun checkboxHaptics() = prefs.getBoolean(CHECKBOX_HAPTICS, true)
+    fun setCheckboxHaptics(value: Boolean) = prefs.edit().putBoolean(CHECKBOX_HAPTICS, value).apply()
+
+    fun performHaptic(kind: HapticKind) {
+        if (!hapticsEnabled()) return
+        when (kind) {
+            HapticKind.WIDGET_HOVER -> if (!widgetHoverHaptics()) return
+            HapticKind.WIDGET_DELETE -> if (!widgetDeleteHaptics()) return
+            HapticKind.WIDGET_RESIZE -> if (!widgetResizeHaptics()) return
+            HapticKind.NAVIGATION -> if (!navigationHaptics()) return
+            HapticKind.ACTION -> if (!actionHaptics()) return
+            HapticKind.CHECKBOX -> if (!checkboxHaptics()) return
+        }
         val vibrator = if (Build.VERSION.SDK_INT >= 31)
             context.getSystemService(VibratorManager::class.java).defaultVibrator
         else context.getSystemService(Context.VIBRATOR_SERVICE) as Vibrator
         if (!vibrator.hasVibrator()) return
-        val effect = if (deleting)
-            VibrationEffect.createWaveform(longArrayOf(0, 28, 34, 48), intArrayOf(0, 150, 0, 255), -1)
-        else VibrationEffect.createOneShot(32L, VibrationEffect.DEFAULT_AMPLITUDE)
+        val effect = when (kind) {
+            HapticKind.WIDGET_HOVER -> if (Build.VERSION.SDK_INT >= 29) VibrationEffect.createPredefined(VibrationEffect.EFFECT_TICK) else VibrationEffect.createOneShot(12L, 80)
+            HapticKind.WIDGET_DELETE -> if (Build.VERSION.SDK_INT >= 29) VibrationEffect.createPredefined(VibrationEffect.EFFECT_HEAVY_CLICK) else VibrationEffect.createWaveform(longArrayOf(0, 30, 25, 55), intArrayOf(0, 180, 0, 255), -1)
+            HapticKind.WIDGET_RESIZE -> VibrationEffect.createOneShot(16L, 110)
+            HapticKind.NAVIGATION -> VibrationEffect.createOneShot(10L, 60)
+            HapticKind.ACTION -> VibrationEffect.createOneShot(18L, 110)
+            HapticKind.CHECKBOX -> VibrationEffect.createOneShot(8L, 70)
+        }
         vibrator.vibrate(effect, AudioAttributes.Builder()
             .setUsage(AudioAttributes.USAGE_ASSISTANCE_SONIFICATION)
             .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION).build())
     }
+
     fun quickLeft(): String? = prefs.getString(QUICK_LEFT, null)
     fun quickRight(): String? = prefs.getString(QUICK_RIGHT, null)
     fun setQuickLeft(value: String?) = prefs.edit().apply { if (value == null) remove(QUICK_LEFT) else putString(QUICK_LEFT, value) }.apply()
@@ -96,43 +124,52 @@ class AppStore(private val context: Context) {
 
     fun beginSession(packageName: String, minutes: Int) {
         val duration = minutes * 60_000L
-        prefs.edit()
-            .putString(ACTIVE_PACKAGE, packageName)
+        prefs.edit().putString(ACTIVE_PACKAGE, packageName)
             .putLong(ACTIVE_UNTIL, System.currentTimeMillis() + duration)
-            .putLong(ACTIVE_DURATION, duration)
-            .putInt(ACTIVE_EXTENSIONS, 0)
-            .remove(ACTIVE_REMAINING)
-            .apply()
+            .putLong(ACTIVE_DURATION, duration).putLong(ACTIVE_REMAINING, duration)
+            .putInt(ACTIVE_EXTENSIONS, 0).remove(SCREEN_LOCKED_AT).apply()
     }
-
     fun clearSession() = prefs.edit().remove(ACTIVE_PACKAGE).remove(ACTIVE_UNTIL)
-        .remove(ACTIVE_DURATION).remove(ACTIVE_EXTENSIONS).remove(ACTIVE_REMAINING).apply()
+        .remove(ACTIVE_DURATION).remove(ACTIVE_EXTENSIONS).remove(ACTIVE_REMAINING).remove(SCREEN_LOCKED_AT).apply()
     fun activePackage(): String? = prefs.getString(ACTIVE_PACKAGE, null)
+    fun lastForegroundPackage(): String? = prefs.getString(LAST_FOREGROUND_PACKAGE, null)
+    fun setLastForegroundPackage(value: String) = prefs.edit().putString(LAST_FOREGROUND_PACKAGE, value).apply()
     fun activeUntil(): Long = prefs.getLong(ACTIVE_UNTIL, 0L)
-    fun hasUsableSession(packageName: String): Boolean {
-        if (activePackage() != packageName) return false
-        val running = activeUntil() - System.currentTimeMillis()
-        val paused = prefs.getLong(ACTIVE_REMAINING, 0L)
-        return running > 0L || paused > 0L
-    }
-    fun pauseSession() {
+    fun remainingSessionMs(): Long {
         val until = activeUntil()
-        if (until > 0) prefs.edit().putLong(ACTIVE_REMAINING, (until - System.currentTimeMillis()).coerceAtLeast(0))
-            .putLong(ACTIVE_UNTIL, 0L).apply()
+        return if (until > 0L) (until - System.currentTimeMillis()).coerceAtLeast(0L)
+        else prefs.getLong(ACTIVE_REMAINING, 0L).coerceAtLeast(0L)
     }
-    fun resumeSession() {
-        if (activeUntil() != 0L) return
-        if (prefs.contains(ACTIVE_REMAINING)) {
-            val remaining = prefs.getLong(ACTIVE_REMAINING, 0L)
-            prefs.edit().putLong(ACTIVE_UNTIL, System.currentTimeMillis() + remaining)
-            .remove(ACTIVE_REMAINING).apply()
+    fun hasUsableSession(packageName: String) = activePackage() == packageName && remainingSessionMs() > 0L
+    fun pauseSession() {
+        if (activePackage() == null) return
+        prefs.edit().putLong(ACTIVE_REMAINING, remainingSessionMs()).putLong(ACTIVE_UNTIL, 0L).apply()
+    }
+    fun resumeSession(): Boolean {
+        if (activePackage() == null) return false
+        val remaining = remainingSessionMs()
+        if (remaining <= 0L) return false
+        prefs.edit().putLong(ACTIVE_UNTIL, System.currentTimeMillis() + remaining).apply()
+        return true
+    }
+    fun markScreenLocked() {
+        pauseSession()
+        if (!prefs.contains(SCREEN_LOCKED_AT)) {
+            prefs.edit().putLong(SCREEN_LOCKED_AT, System.currentTimeMillis()).apply()
         }
     }
-    fun markScreenLocked() { pauseSession(); prefs.edit().putLong(SCREEN_LOCKED_AT, System.currentTimeMillis()).apply() }
-    fun resetSessionAfterLock(timeoutMs: Long) {
+    fun wasScreenLocked() = prefs.contains(SCREEN_LOCKED_AT)
+    fun clearScreenLockMarker() = prefs.edit().remove(SCREEN_LOCKED_AT).apply()
+    fun unlockInvalidated(maxGraceMs: Long = 2 * 60_000L): Boolean {
         val lockedAt = prefs.getLong(SCREEN_LOCKED_AT, 0L)
-        if (lockedAt > 0L && System.currentTimeMillis() - lockedAt >= timeoutMs) clearSession()
+        if (lockedAt <= 0L) return false
+        val remainingAtLock = prefs.getLong(ACTIVE_REMAINING, maxGraceMs).coerceAtLeast(1L)
+        val allowedLockTime = minOf(maxGraceMs, remainingAtLock)
+        val lockedDuration = System.currentTimeMillis() - lockedAt
+        val invalid = lockedDuration >= allowedLockTime
         prefs.edit().remove(SCREEN_LOCKED_AT).apply()
+        if (invalid) clearSession()
+        return invalid
     }
     fun extensions() = prefs.getInt(ACTIVE_EXTENSIONS, 0)
     fun extendSession(): Boolean {
@@ -140,7 +177,7 @@ class AppStore(private val context: Context) {
         val duration = prefs.getLong(ACTIVE_DURATION, 0L)
         if (count >= 3 || duration <= 0L) return false
         prefs.edit().putInt(ACTIVE_EXTENSIONS, count + 1)
-            .putLong(ACTIVE_UNTIL, System.currentTimeMillis() + duration).apply()
+            .putLong(ACTIVE_UNTIL, System.currentTimeMillis() + duration).putLong(ACTIVE_REMAINING, duration).apply()
         return true
     }
 
@@ -156,8 +193,15 @@ class AppStore(private val context: Context) {
         private const val ACTIVE_EXTENSIONS = "active_extensions"
         private const val ACTIVE_REMAINING = "active_remaining"
         private const val SCREEN_LOCKED_AT = "screen_locked_at"
+        private const val LAST_FOREGROUND_PACKAGE = "last_foreground_package"
         private const val SHOW_CLOCK = "show_clock"
+        private const val HAPTICS_ENABLED = "haptics_enabled"
+        private const val WIDGET_HOVER_HAPTICS = "widget_hover_haptics"
         private const val WIDGET_DELETE_HAPTICS = "widget_delete_haptics"
+        private const val WIDGET_RESIZE_HAPTICS = "widget_resize_haptics"
+        private const val NAVIGATION_HAPTICS = "navigation_haptics"
+        private const val ACTION_HAPTICS = "action_haptics"
+        private const val CHECKBOX_HAPTICS = "checkbox_haptics"
         private const val QUICK_LEFT = "quick_left"
         private const val QUICK_RIGHT = "quick_right"
         private const val WIDGETS = "widget_ids"
@@ -168,3 +212,4 @@ class AppStore(private val context: Context) {
         const val RIGHT_WIDGET_SCREEN = "right"
     }
 }
+

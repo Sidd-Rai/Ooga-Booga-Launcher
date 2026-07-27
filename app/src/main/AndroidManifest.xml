@@ -16,42 +16,57 @@
 
         <activity
             android:name=".AccessibilityHelpActivity"
+            android:screenOrientation="portrait"
             android:exported="false" />
 
         <activity
             android:name=".PermissionsActivity"
+            android:screenOrientation="portrait"
+            android:exported="false" />
+
+        <activity
+            android:name=".HapticsActivity"
+            android:screenOrientation="portrait"
             android:exported="false" />
 
         <activity
             android:name=".HomeSettingsActivity"
+            android:screenOrientation="portrait"
             android:exported="false" />
 
         <activity
             android:name=".WidgetSettingsActivity"
+            android:screenOrientation="portrait"
             android:exported="false" />
 
         <activity
             android:name=".QuickAppsActivity"
+            android:screenOrientation="portrait"
             android:exported="false" />
 
         <activity
             android:name=".PrivacyPolicyActivity"
+            android:screenOrientation="portrait"
             android:exported="false" />
 
         <activity
             android:name=".ThemeEditorActivity"
+            android:screenOrientation="portrait"
             android:exported="false" />
 
         <activity
             android:name=".AppSelectionActivity"
+            android:screenOrientation="portrait"
             android:exported="false" />
 
         <activity
             android:name=".SettingsActivity"
+            android:screenOrientation="portrait"
             android:exported="false" />
 
         <activity
             android:name=".MainActivity"
+            android:screenOrientation="portrait"
             android:excludeFromRecents="true"
             android:exported="true"
             android:launchMode="singleTask"

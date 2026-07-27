@@ -3,7 +3,11 @@ package com.siddrai.oogaboogalauncher
 import android.annotation.SuppressLint
 import android.app.Activity
 import android.app.AlertDialog
+import android.content.BroadcastReceiver
+import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
+import android.content.pm.ActivityInfo
 import android.graphics.Typeface
 import android.net.Uri
 import android.os.Bundle
@@ -21,22 +25,50 @@ class AppSelectionActivity : Activity() {
     private lateinit var originalSelection: Set<String>
     private var editing = true
     private var query = ""
+    private var receiverRegistered = false
+    private val packageReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context?, intent: Intent?) { store.invalidateApps(); render() }
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
         AppTheme.prepare(this); super.onCreate(savedInstanceState); AppTheme.apply(this)
         store = AppStore(this)
         mode = intent.getStringExtra("mode") ?: "pinned"
-        editing = mode != "hidden"
-        selected = when (mode) {
-            "hidden" -> store.hidden().toMutableSet()
-            "distracting" -> store.distracting().toMutableSet()
-            "shutup" -> store.shutUp().toMutableSet()
-            else -> store.pinned().toMutableSet()
+        editing = savedInstanceState?.getBoolean("editing") ?: (mode != "hidden")
+        val stored = when (mode) {
+            "hidden" -> store.hidden()
+            "distracting" -> store.distracting()
+            "shutup" -> store.shutUp()
+            else -> store.pinned()
         }
-        originalSelection = selected.toSet()
+        selected = savedInstanceState?.getStringArrayList("selected")?.toMutableSet() ?: stored.toMutableSet()
+        originalSelection = savedInstanceState?.getStringArrayList("original")?.toSet() ?: selected.toSet()
+        query = savedInstanceState?.getString("query").orEmpty()
         if (android.os.Build.VERSION.SDK_INT >= 33) onBackInvokedDispatcher.registerOnBackInvokedCallback(
             android.window.OnBackInvokedDispatcher.PRIORITY_DEFAULT) { handleBack() }
+        val filter = IntentFilter().apply {
+            addAction(Intent.ACTION_PACKAGE_ADDED)
+            addAction(Intent.ACTION_PACKAGE_REMOVED)
+            addAction(Intent.ACTION_PACKAGE_CHANGED)
+            addAction(Intent.ACTION_PACKAGE_REPLACED)
+            addAction(Intent.ACTION_PACKAGE_FULLY_REMOVED)
+            addDataScheme("package")
+        }
+        if (android.os.Build.VERSION.SDK_INT >= 33) registerReceiver(packageReceiver, filter, Context.RECEIVER_NOT_EXPORTED) else registerReceiver(packageReceiver, filter)
+        receiverRegistered = true
         render()
+    }
+
+    override fun onResume() {
+        super.onResume()
+        store.invalidateApps()
+        render()
+    }
+
+    override fun onSaveInstanceState(outState: Bundle) {
+        outState.putStringArrayList("selected", ArrayList(selected)); outState.putStringArrayList("original", ArrayList(originalSelection))
+        outState.putBoolean("editing", editing); outState.putString("query", query); super.onSaveInstanceState(outState)
     }
 
     private fun saveSelection() {
@@ -87,8 +119,8 @@ class AppSelectionActivity : Activity() {
         }
         if (editing) root.addView(LinearLayout(this).apply {
             gravity = Gravity.RIGHT or Gravity.CENTER_VERTICAL
-            addView(action("SELECT ALL") { selected.clear(); selected.addAll(apps.map { it.packageName }); populate(query) })
-            addView(action("UNSELECT ALL") { selected.clear(); populate(query) })
+            addView(action("SELECT ALL") { store.performHaptic(HapticKind.CHECKBOX); selected.clear(); selected.addAll(apps.map { it.packageName }); populate(query) })
+            addView(action("UNSELECT ALL") { store.performHaptic(HapticKind.CHECKBOX); selected.clear(); populate(query) })
         }, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(42)))
         search = EditText(this).apply {
             hint = "SEARCH APPS"; setHintTextColor(MainActivity.MUTED); setTextColor(MainActivity.INK)
@@ -131,7 +163,10 @@ class AppSelectionActivity : Activity() {
             arrayOf(intArrayOf(android.R.attr.state_checked), intArrayOf()),
             intArrayOf(MainActivity.ACCENT, MainActivity.MUTED))
         isChecked = app.packageName in selected; setPadding(dp(2), 0, 0, 0)
-        setOnCheckedChangeListener { _, checked -> if (checked) selected.add(app.packageName) else selected.remove(app.packageName) }
+        setOnCheckedChangeListener { _, checked ->
+            store.performHaptic(HapticKind.CHECKBOX)
+            if (checked) selected.add(app.packageName) else selected.remove(app.packageName)
+        }
     }
 
     private fun appRow(app: LaunchableApp) = TextView(this).apply {
@@ -149,6 +184,7 @@ class AppSelectionActivity : Activity() {
             "Unhide", "App info"
         )
         AppTheme.showMenu(this, app.label, actions) { index ->
+            store.performHaptic(HapticKind.ACTION)
             when (actions[index]) {
                 "Pin to home" -> { store.setPinned(store.pinned() + app.packageName); selected.remove(app.packageName) }
                 "Unpin from home" -> store.setPinned(store.pinned() - app.packageName)
@@ -165,5 +201,7 @@ class AppSelectionActivity : Activity() {
         text = label; textSize = 10f; letterSpacing = .08f; gravity = Gravity.CENTER; setTextColor(MainActivity.ACCENT)
         setPadding(dp(15), 0, 0, 0); setOnClickListener { click() }
     }
+    override fun onDestroy() { if (receiverRegistered) unregisterReceiver(packageReceiver); super.onDestroy() }
     private fun dp(v: Int) = (v * resources.displayMetrics.density).toInt()
 }
+

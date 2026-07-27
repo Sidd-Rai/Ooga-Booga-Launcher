@@ -31,15 +31,37 @@ class TimeLimitService : AccessibilityService() {
     private var foregroundPackage: String? = null
     private var promptingPackage: String? = null
     private var promptOverlayPackage: String? = null
+    private var sessionInForeground = false
     private var overlay: View? = null
     private var receiverRegistered = false
+
     private val screenReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
             when (intent?.action) {
-                Intent.ACTION_SCREEN_OFF -> store.markScreenLocked()
+                Intent.ACTION_SCREEN_OFF -> {
+                    if (sessionInForeground || (foregroundPackage != null && foregroundPackage in store.distracting())) {
+                        store.markScreenLocked()
+                    } else {
+                        store.pauseSession()
+                        store.clearScreenLockMarker()
+                    }
+                    sessionInForeground = false
+                    handler.removeCallbacks(expiry)
+                }
                 Intent.ACTION_USER_PRESENT -> {
-                    store.resetSessionAfterLock(LOCK_RESET_MS)
-                    if (store.activePackage() == foregroundPackage) { store.resumeSession(); scheduleExpiry() }
+                    val invalid = store.unlockInvalidated(LOCK_RESET_MS)
+                    val target = foregroundPackage ?: store.lastForegroundPackage()
+                    if (target != null && target in store.distracting()) {
+                        foregroundPackage = target
+                        val active = store.activePackage()
+                        if (invalid || active == null || active != target || store.remainingSessionMs() <= 0L) {
+                            store.clearSession()
+                            promptFor(target)
+                        } else {
+                            sessionInForeground = true
+                            if (store.resumeSession()) scheduleExpiry() else showExpired()
+                        }
+                    }
                 }
             }
         }
@@ -53,6 +75,7 @@ class TimeLimitService : AccessibilityService() {
             } else scheduleExpiry()
         }
     }
+
     private fun scheduleExpiry() {
         handler.removeCallbacks(expiry)
         val delay = store.activeUntil() - System.currentTimeMillis()
@@ -69,7 +92,33 @@ class TimeLimitService : AccessibilityService() {
             else registerReceiver(screenReceiver, filter)
             receiverRegistered = true
         }
-        scheduleExpiry()
+        val invalid = store.unlockInvalidated(LOCK_RESET_MS)
+        foregroundPackage = store.lastForegroundPackage()
+        if (invalid && foregroundPackage != null && foregroundPackage in store.distracting()) {
+            store.clearSession()
+            promptFor(foregroundPackage!!)
+        } else {
+            foregroundPackage?.let { handleForeground(it) }
+        }
+    }
+
+    private fun isInputMethod(pkg: String): Boolean {
+        if (pkg == packageName || pkg == "android" || pkg == "com.android.systemui") return false
+        val defaultIme = Settings.Secure.getString(contentResolver, Settings.Secure.DEFAULT_INPUT_METHOD)?.substringBefore('/')
+        if (pkg == defaultIme) return true
+        val imm = getSystemService(Context.INPUT_METHOD_SERVICE) as? InputMethodManager ?: return false
+        return imm.enabledInputMethodList.any { it.packageName == pkg }
+    }
+
+    private fun promptFor(targetPackage: String) {
+        if (promptingPackage == targetPackage || promptOverlayPackage == targetPackage) return
+        promptingPackage = targetPackage
+        showTimerPrompt(targetPackage)
+    }
+
+    private fun showExpired() {
+        if (overlay != null) return
+        if (store.extensions() >= 3) closeApp("OOPS — out of time") else showTimeUp()
     }
 
     private fun showTimerPrompt(targetPackage: String) {
@@ -128,7 +177,9 @@ class TimeLimitService : AccessibilityService() {
     }
 
     private fun beginTimer(targetPackage: String, minutes: Int) {
+        store.performHaptic(HapticKind.ACTION)
         store.beginSession(targetPackage, minutes)
+        sessionInForeground = (foregroundPackage == targetPackage)
         scheduleExpiry()
         promptingPackage = null; promptOverlayPackage = null; removeOverlay()
     }
@@ -179,29 +230,49 @@ class TimeLimitService : AccessibilityService() {
         overlay?.let { runCatching { (getSystemService(WINDOW_SERVICE) as WindowManager).removeView(it) } }
         overlay = null
     }
+
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
         val next = event?.packageName?.toString() ?: return
+        handleForeground(next)
+    }
+
+    private fun handleForeground(next: String) {
+        if (isInputMethod(next)) return
         if (next == packageName) {
-            if (promptOverlayPackage != null && event.className?.toString() == MainActivity::class.java.name) {
-                promptOverlayPackage = null; promptingPackage = null; removeOverlay()
-            }
+            store.setLastForegroundPackage(next); sessionInForeground = false
+            foregroundPackage = next; store.pauseSession(); handler.removeCallbacks(expiry)
+            if (promptOverlayPackage != null) { promptOverlayPackage = null; promptingPackage = null; removeOverlay() }
             return
+        }
+        if (next == "com.android.systemui") {
+            sessionInForeground = false
+            store.pauseSession(); handler.removeCallbacks(expiry); return
         }
         promptOverlayPackage?.let { target ->
             if (next == target) { foregroundPackage = next; return }
-            val inputMethod = Settings.Secure.getString(contentResolver, Settings.Secure.DEFAULT_INPUT_METHOD)
-                ?.substringBefore('/')
-            if (next == inputMethod || next == "com.android.systemui") return
             promptOverlayPackage = null; promptingPackage = null; removeOverlay()
         }
         if (next != promptingPackage) promptingPackage = null
+        store.setLastForegroundPackage(next)
         foregroundPackage = next
         val active = store.activePackage()
-        if (active != null) {
-            if (next == active) { store.resumeSession(); scheduleExpiry() } else { store.pauseSession(); handler.removeCallbacks(expiry) }
-        } else if (next in store.distracting() && promptingPackage != next) {
-            promptingPackage = next
-            showTimerPrompt(next)
+        when {
+            active == next -> {
+                if (store.remainingSessionMs() <= 0L) {
+                    sessionInForeground = false
+                    store.clearSession()
+                    promptFor(next)
+                } else {
+                    sessionInForeground = true
+                    if (store.resumeSession()) scheduleExpiry() else showExpired()
+                }
+            }
+            active != null && next in store.distracting() -> {
+                sessionInForeground = false; store.pauseSession(); store.clearSession(); promptFor(next)
+            }
+            active != null -> { sessionInForeground = false; store.pauseSession(); handler.removeCallbacks(expiry) }
+            next in store.distracting() -> { sessionInForeground = false; promptFor(next) }
+            else -> sessionInForeground = false
         }
     }
     override fun onInterrupt() = Unit
@@ -213,3 +284,4 @@ class TimeLimitService : AccessibilityService() {
     private fun dp(value: Int) = (value * resources.displayMetrics.density).toInt()
     companion object { private const val LOCK_RESET_MS = 2 * 60_000L }
 }
+

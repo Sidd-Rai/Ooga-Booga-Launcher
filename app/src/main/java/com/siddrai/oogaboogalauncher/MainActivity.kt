@@ -72,20 +72,33 @@ class MainActivity : Activity() {
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        requestedOrientation = android.content.pm.ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
         AppTheme.prepare(this)
         super.onCreate(savedInstanceState)
         AppTheme.apply(this)
         store = AppStore(this)
+        store.setLastForegroundPackage(packageName)
         widgetHost = AppWidgetHost(this, WidgetSettingsActivity.HOST_ID)
         buildPages()
         registerDrawerBack()
         requestHomeRole()
         val packageFilter = IntentFilter().apply {
-            addAction(Intent.ACTION_PACKAGE_ADDED); addAction(Intent.ACTION_PACKAGE_REMOVED); addAction(Intent.ACTION_PACKAGE_CHANGED)
+            addAction(Intent.ACTION_PACKAGE_ADDED)
+            addAction(Intent.ACTION_PACKAGE_REMOVED)
+            addAction(Intent.ACTION_PACKAGE_CHANGED)
+            addAction(Intent.ACTION_PACKAGE_REPLACED)
+            addAction(Intent.ACTION_PACKAGE_FULLY_REMOVED)
             addDataScheme("package")
         }
         if (android.os.Build.VERSION.SDK_INT >= 33) registerReceiver(packageReceiver, packageFilter, Context.RECEIVER_NOT_EXPORTED)
         else registerReceiver(packageReceiver, packageFilter)
+    }
+
+    override fun onResume() {
+        super.onResume()
+        store.setLastForegroundPackage(packageName)
+        store.invalidateApps()
+        refreshHome()
     }
 
     override fun onStart() { super.onStart(); widgetHost.startListening() }
@@ -93,6 +106,7 @@ class MainActivity : Activity() {
 
     override fun onNewIntent(intent: Intent?) {
         super.onNewIntent(intent)
+        store.setLastForegroundPackage(packageName)
         AppTheme.dismissMenu(this)
         if (::root.isInitialized) {
             drawer.animate().cancel(); home.animate().cancel()
@@ -161,6 +175,7 @@ class MainActivity : Activity() {
 
     private fun buildPages(keepDrawer: Boolean = false) {
         deleteTarget = null; deleteTargetHovered = false; activeResizeFrame = null
+        if ((currentScreen < 0 && !store.leftScreen()) || (currentScreen > 0 && !store.rightScreen())) currentScreen = 0
         screenCache.clear(); screenFrameCache.clear(); screenScrollCache.clear()
         root = FrameLayout(this).apply { setBackgroundColor(BG); clipChildren = false; clipToPadding = false }
         home = screenView(currentScreen)
@@ -183,6 +198,7 @@ class MainActivity : Activity() {
         if (drawerOpen) return
         screenLongPressAllowed = false
         drawerOpen = true
+        store.performHaptic(HapticKind.NAVIGATION)
         registerDrawerBack()
         drawer.visibility = View.VISIBLE
         if (!animated) { home.visibility = View.GONE; return }
@@ -194,6 +210,7 @@ class MainActivity : Activity() {
     private fun showHome(animated: Boolean = true) {
         if (!drawerOpen) return
         drawerOpen = false
+        store.performHaptic(HapticKind.NAVIGATION)
         home.visibility = View.VISIBLE
         if (::drawerSearch.isInitialized) drawerSearch.text.clear()
         hideKeyboard()
@@ -270,6 +287,7 @@ class MainActivity : Activity() {
                 },
                 onResize = { newWidth, newHeight, finished ->
                     if (finished) {
+                        store.performHaptic(HapticKind.WIDGET_RESIZE)
                         transferFrameTranslation(frame)
                         resolveWidgetCollision(frame, canvas, availableWidth)
                         persistWidgetFrame(id, frame, availableWidth)
@@ -331,7 +349,7 @@ class MainActivity : Activity() {
 
 
     private fun widgetFeedback(view: View, deleting: Boolean) {
-        store.performWidgetHaptic(deleting)
+        store.performHaptic(if (deleting) HapticKind.WIDGET_DELETE else HapticKind.WIDGET_HOVER)
         view.performHapticFeedback(
             if (deleting) HapticFeedbackConstants.CONFIRM else HapticFeedbackConstants.CLOCK_TICK,
             HapticFeedbackConstants.FLAG_IGNORE_GLOBAL_SETTING or HapticFeedbackConstants.FLAG_IGNORE_VIEW_SETTING
@@ -460,6 +478,7 @@ class MainActivity : Activity() {
 
     private fun showScreen(target: Int) {
         val previous = currentScreen
+        store.performHaptic(HapticKind.NAVIGATION)
         val old = home
         currentScreen = target
         val next = screenView(target)
@@ -621,6 +640,7 @@ class MainActivity : Activity() {
             "Hide", "App info"
         )
         AppTheme.showMenu(this, app.label, actions) { index ->
+            store.performHaptic(HapticKind.ACTION)
             when (actions[index]) {
                 "Pin to home" -> { store.setPinned(store.pinned() + app.packageName); store.setHidden(store.hidden() - app.packageName) }
                 "Unpin from home" -> store.setPinned(store.pinned() - app.packageName)

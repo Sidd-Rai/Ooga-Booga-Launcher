@@ -90,10 +90,19 @@ class ResizableWidgetFrame(
                     onResize(nextWidth, nextHeight, false)
                 }
             }
-            MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
-                if (moving && moved) onMove(translationX, translationY)
-                else onResize(width, height, true)
+            MotionEvent.ACTION_UP -> {
+                if (moving && moved) onMove(translationX, translationY) else onResize(width, height, true)
                 parent?.requestDisallowInterceptTouchEvent(false)
+            }
+            MotionEvent.ACTION_CANCEL -> {
+                translationX = startTranslationX; translationY = startTranslationY
+                if (moving) {
+                    moving = false; moved = false; onEditEnd()
+                } else {
+                    layoutParams = layoutParams.apply { width = startWidth; height = startHeight }
+                    onResize(startWidth, startHeight, false); onEditEnd()
+                }
+                editing = false; parent?.requestDisallowInterceptTouchEvent(false); invalidate()
             }
         }
         return true
