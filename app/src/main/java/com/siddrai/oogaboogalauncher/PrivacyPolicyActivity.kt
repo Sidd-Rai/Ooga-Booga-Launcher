@@ -12,6 +12,7 @@ import android.widget.TextView
 
 class PrivacyPolicyActivity : Activity() {
     override fun onCreate(savedInstanceState: Bundle?) {
+        requestedOrientation = android.content.pm.ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
         AppTheme.prepare(this)
         super.onCreate(savedInstanceState)
         AppTheme.apply(this)

@@ -16,6 +16,7 @@ import org.json.JSONArray
 
 class SettingsActivity : Activity() {
     override fun onCreate(savedInstanceState: Bundle?) {
+        requestedOrientation = android.content.pm.ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
         AppTheme.prepare(this); super.onCreate(savedInstanceState); AppTheme.apply(this)
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL; setPadding(dp(24), dp(40), dp(24), dp(20)); setBackgroundColor(MainActivity.BG)

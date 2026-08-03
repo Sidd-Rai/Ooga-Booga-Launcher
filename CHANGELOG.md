@@ -1,5 +1,19 @@
 # Changelog
 
+## 1.2.2 — 2026-08-03
+
+- Enforced portrait-only orientation across all launcher activities to suppress rotation navbar popups
+- Fixed timer bypass when locking/unlocking phone; session now expires after min(2 minutes, remaining time) locked
+- Fixed timer bypass when switching distracting apps via notification deep links
+- Fixed stuck zero-remaining sessions clearing them immediately to prompt for a new timer choice
+- Fixed keyboard timer pauses by evaluating all enabled IMEs/keyboards
+- Fixed widget gesture cancellations (ACTION_CANCEL) to prevent stuck widget states or deletion target overlays
+- Added subtle hover vibration over the Remove button and heavy double-pulse vibration upon deletion
+- Reset active screen back to home screen immediately if side screens are disabled in settings
+- Grouped haptics settings into a new dedicated, category-grouped Haptics menu in Settings with live haptic previews
+- Persisted checklist edits in Settings on configuration orientation changes
+- Dynamically refreshed open settings selection lists on application installs and removals
+
 ## 1.2.1 — 2026-07-21
 
 - Fixed cached left and right widget screens appearing blank after opening the app drawer and pressing Home
